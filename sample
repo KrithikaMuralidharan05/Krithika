@@ -1,0 +1,226 @@
+
+TESTCASE B.SCB.INT.AUTO.REPAY
+*-----------------------------------------------------------------------------
+* @author     :  
+*-----------------------------------------------------------------------------
+*
+*   Modification History :
+*
+
+	$INSERT I_COMMON 
+    $INSERT I_EQUATE
+    $INSERT I_B.SCB.INT.AUTO.REPAY.COMMON
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.LD.LOANS.AND.DEPOSITS
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.CUSTOMER
+    $INSERT I_F.LMM.ACCOUNT.BALANCES
+    $INSERT I_F.DATES
+*
+*-----------------------------------------------------------------------------
+*** <region = Header> 
+*** <desc> </desc>
+
+    UTF.setTarget("B.SCB.INT.AUTO.REPAY")                    ;* Name of the Target routine for which test is done
+    UTF.setDescription("Loans - Interest recovery on maturity") ;* Default description for all tests
+    GOSUB runtest1                                   ;* FT for same customer (LD Customer & STO.INT.ACCT - Customer), FT should be authorised.
+    GOSUB runtest2                                  ;* FT for same customer but with block flag (CUSTOMER.STATUS / ACCOUNT STATUS NE '10'). FT should be IHLD.
+    GOSUB runtest3                                  ;* FT for same customer with NO block flag but no-account balance (ACCOUNT>WORKING.BALANCE), FT should be IHLD.
+    GOSUB runtest4                                  ;* FT for diff customer(Y.STO.CUSTOMER NE Y.LD.CUSTOMER). FT should be IHLD
+    GOSUB runtest5                                  ;* FT for same customer with NO block flag but having account balance (ACCOUNT>WORKING.BALANCE), FT should be authorised.
+    
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> FT for same customer (LD Customer & STO.INT.ACCT - Customer), FT should be authorised. </desc>
+
+runtest1:
+
+    UTF.reset() ;* Reset all
+     
+    C = '5' ; * as Y.STO.CUSTOMER
+    E = '5'; * as Y.LD.CUSTOMER
+    
+    V = '10'; * as BLOCK.CODE 
+    
+    P = '10'; * as Y.AC.STATUS
+    A = '10'; * Y.CUS.STATUS
+    
+    L = '' ; * as COLLATERAL FLAG
+    ETEXT = '' ; * as GTS.MODE
+    
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    GOSUB setSharedStubs ;*Stubs if any required for all test cases
+* set data for this test
+* set stubs for this test
+* addParameter
+    UTF.runTest("Test 1 Check")
+    UTF.assertEquals('0', ETEXT) 
+    UTF.assertEquals('NO', L) 
+* doAssertions for this testcase
+
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> FT for same customer but with block flag (CUSTOMER.STATUS / ACCOUNT STATUS NE '10'). FT should be IHLD. </desc>
+
+runtest2:
+
+    UTF.reset() ;* Reset all
+     
+    C = '5' ; * as Y.STO.CUSTOMER
+    E = '5'; * as Y.LD.CUSTOMER
+    
+    V = '10'; * as BLOCK.CODE 
+    
+    P = '54'; * as Y.AC.STATUS
+    A = '54'; * Y.CUS.STATUS
+    
+    L = '' ; * as COLLATERAL FLAG
+    ETEXT = '' ; * as GTS.MODE
+    
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    GOSUB setSharedStubs ;*Stubs if any required for all test cases
+* set data for this test
+* set stubs for this test
+* addParameter
+    UTF.runTest("Test 2 Check")
+    UTF.assertEquals('4', ETEXT) 
+    UTF.assertEquals('NO', L) 
+* doAssertions for this testcase
+
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase3>
+*** <desc> FT for same customer with NO block flag but no-account balance (ACCOUNT>WORKING.BALANCE), FT should be AA. </desc>
+runtest3:
+
+    UTF.reset() ;* Reset all
+     
+    C = '5' ; * as Y.STO.CUSTOMER
+    E = '5'; * as Y.LD.CUSTOMER
+    
+    V = '10'; * as BLOCK.CODE 
+    
+    P = '10'; * as Y.AC.STATUS
+    A = '10'; * Y.CUS.STATUS
+    
+    L = '' ; * as COLLATERAL FLAG
+    ETEXT = '' ; * as GTS.MODE
+    
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    GOSUB setSharedStubs ;*Stubs if any required for all test cases
+* set data for this test
+* set stubs for this test
+* addParameter
+    UTF.runTest("Test 3 Check")
+    UTF.assertEquals('0', ETEXT) 
+    UTF.assertEquals('NO', L) 
+* doAssertions for this testcase
+
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase4>
+*** <desc> FT for diff customer(Y.STO.CUSTOMER NE Y.LD.CUSTOMER). FT should be IHLD </desc>
+runtest4:
+
+    UTF.reset() ;* Reset all
+     
+    C = '5' ; * as Y.STO.CUSTOMER
+    E = '9'; * as Y.LD.CUSTOMER
+    
+    V = '10'; * as BLOCK.CODE 
+    
+    P = '10'; * as Y.AC.STATUS
+    A = '10'; * Y.CUS.STATUS
+    
+    L = '' ; * as COLLATERAL FLAG
+    ETEXT = '' ; * as GTS.MODE
+    
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    GOSUB setSharedStubs ;*Stubs if any required for all test cases
+* set data for this test
+* set stubs for this test
+* addParameter
+    UTF.runTest("Test 4 Check")
+    UTF.assertEquals('4', ETEXT) 
+    UTF.assertEquals('YES', L) 
+* doAssertions for this testcase
+
+*
+    RETURN 
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase5>
+*** <desc> FT for same customer with NO block flag but having account balance (ACCOUNT>WORKING.BALANCE), check FT status. </desc>
+runtest5:
+
+    UTF.reset() ;* Reset all 
+     
+    C = '6' ; * as Y.STO.CUSTOMER
+    E = '6'; * as Y.LD.CUSTOMER
+    
+    V = '10'; * as BLOCK.CODE 
+    
+    P = '10'; * as Y.AC.STATUS
+    A = '10'; * Y.CUS.STATUS
+    
+    L = '' ; * as COLLATERAL FLAG
+    ETEXT = '' ; * as GTS.MODE
+    
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    GOSUB setSharedStubs ;*Stubs if any required for all test cases
+* set data for this test
+* set stubs for this test
+* addParameter
+    UTF.runTest("Test 5 Check")
+    UTF.assertEquals('0', ETEXT) 
+    UTF.assertEquals('NO', L) 
+* doAssertions for this testcase
+
+*
+    RETURN 
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> description of testcase2</desc>
+setSharedStubs:
+	
+    STUB = UTF.addStub("CHARX")
+    STUB2 = UTF.addStub("SCB.GET.ALLOWED.CUST.SEG")
+    UTF.ignoreMissingStubs()
+     
+    *UTF.addStubParam(STUB2, UTF.any(), UTF.any())
+* STUB = UTF.addStub("MY.STUBED CALL")
+* UTF.addStubParam(STUB, "20150903", "September 3rd 2015")
+* UTF.addStubParam(STUB, UTF.matches("2N"), UTF.same())
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Set details common for all test cases>
+*** <desc> </desc>
+setSharedDetails:
+    
+    R.REC.VAL = ''
+    UTF.setRecord(F.LD.LOANS.AND.DEPOSITS, Y.LMM.ID, R.REC.VAL)
+    UTF.addParam(Y.LMM.ID)
+
+	*F.USER = ''
+*    UTF.setRecord(F.USER, MAKER.NAME, R.USER)
+
+* UTF.setRecord("F.MY.TABLE", "MY.KEY.1", 'Field1' : @FM : "Field2")
+* CachePut("MY.BUCKET", "KEY1", "Initial value")
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+END
