@@ -1,39 +1,108 @@
-TESTCASE "SCB.INP.DEF.BR.AMT_EQD"
+TESTCASE SCB.INP.DEF.BR.AMT
 
-INITIALISE
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_F.SECURITY.TRANSFER
+$INSERT I_F.SCB.PVB.EQD.GROUP.TODAY
 
-* Mock SECURITY.TRANSFER input
-SET R.NEW(SC.STR.LOCAL.REF)<1,1> = "EQD.TEST.GRP.USD.001"
+    UTF.setTarget("SCB.INP.DEF.BR.AMT")
+    UTF.setDescription("Default BR Amount and Customer Amount")
 
-* Mock record returned by F.READ
-SET R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID> = "TRD001"
-SET R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,1> = "100"
-SET R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,2> = "200"
-SET R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,3> = "300"
+    GOSUB runtest1
+    GOSUB runtest2
 
-CALL "SCB.INP.DEF.BR.AMT"
+    RETURN
 
-ASSERT R.NEW(SC.STR.BR.NET.AMT) = "600"
-ASSERT R.NEW(SC.STR.CUST.NET.AMT) = "600"
+*--------------------------------------------------------------------
+* Test Case 1
+* Group ID starts with EQD
+*--------------------------------------------------------------------
+runtest1:
 
-ENDTEST
+    UTF.reset()
 
+    Y.GRP.ID = "EQD123456"
 
+    EXPECTED.AMT = "600"
 
-TESTCASE "SCB.INP.DEF.BR.AMT_NON_EQD"
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
 
-INITIALISE
+    UTF.runTest("EQD Group Id")
 
-* Triggers IF Y.GRP.ID[1,3] NE "EQD"
-SET R.NEW(SC.STR.LOCAL.REF)<1,1> = "PREFIX1EQD.TEST.GRP.USD.002"
+    UTF.assertEquals(EXPECTED.AMT,R.NEW(SC.STR.BR.NET.AMT))
+    UTF.assertEquals(EXPECTED.AMT,R.NEW(SC.STR.CUST.NET.AMT))
 
-SET R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID> = "TRD002"
-SET R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,1> = "500"
-SET R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,2> = "250"
+    RETURN
 
-CALL "SCB.INP.DEF.BR.AMT"
+*--------------------------------------------------------------------
+* Test Case 2
+* Group ID does not start with EQD
+*--------------------------------------------------------------------
+runtest2:
 
-ASSERT R.NEW(SC.STR.BR.NET.AMT) = "750"
-ASSERT R.NEW(SC.STR.CUST.NET.AMT) = "750"
+    UTF.reset()
 
-ENDTEST
+    Y.GRP.ID = "1234567EQD99999"
+
+    EXPECTED.AMT = "750"
+
+    GOSUB setSharedDetails2
+    GOSUB setSharedStubs
+
+    UTF.runTest("NON EQD Group Id")
+
+    UTF.assertEquals(EXPECTED.AMT,R.NEW(SC.STR.BR.NET.AMT))
+    UTF.assertEquals(EXPECTED.AMT,R.NEW(SC.STR.CUST.NET.AMT))
+
+    RETURN
+
+*--------------------------------------------------------------------
+setSharedStubs:
+
+    UTF.ignoreMissingStubs()
+
+    RETURN
+
+*--------------------------------------------------------------------
+setSharedDetails:
+
+    R.NEW = ''
+
+    R.NEW(SC.STR.LOCAL.REF) = Y.GRP.ID
+
+    R.GROUP.TODAY = ''
+
+    R.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,1> = "100"
+    R.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,2> = "200"
+    R.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,3> = "300"
+
+    UTF.setRecord(F.SCB.PVB.EQD.GROUP.TODAY,
+                  Y.GRP.ID,
+                  R.GROUP.TODAY)
+
+    UTF.addParam(R.NEW)
+
+    RETURN
+
+*--------------------------------------------------------------------
+setSharedDetails2:
+
+    R.NEW = ''
+
+    R.NEW(SC.STR.LOCAL.REF) = Y.GRP.ID
+
+    R.GROUP.TODAY = ''
+
+    R.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,1> = "500"
+    R.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD,2> = "250"
+
+    UTF.setRecord(F.SCB.PVB.EQD.GROUP.TODAY,
+                  "EQD99999",
+                  R.GROUP.TODAY)
+
+    UTF.addParam(R.NEW)
+
+    RETURN
+
+END
