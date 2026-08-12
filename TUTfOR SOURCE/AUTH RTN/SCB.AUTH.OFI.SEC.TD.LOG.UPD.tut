@@ -1,0 +1,70 @@
+TESTCASE SCB.AUTH.OFI.SEC.TD.LOG.UPD
+*-----------------------------------------------------------------------------
+* @author     :  
+*-----------------------------------------------------------------------------
+*
+*   Modification History :
+*
+*
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.SEC.TRADE
+    $INSERT I_F.SCB.OFI.SEC.TRADE.LOG
+
+    UTF.setTarget("SCB.AUTH.OFI.SEC.TD.LOG.UPD")                    ;* Name of the Target routine for which test is done
+    UTF.setDescription("Auth routine") ;* Default description for all tests
+    GOSUB runtest1                                  ;* Meaningful description for testcase 1
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> description of testcase1</desc>
+
+runtest1:
+    R.NEW(SC.SBS.LOCAL.REF)<1,36> = "T123456"
+    R.NEW(SC.SBS.RECORD.STATUS) = "INAU"
+    R.SCB.OFI.SEC.TD.LOG<SCBOFI.TRADE.CREATION.STATUS> = 'INAU' 
+    UTF.reset() ;* Reset all
+
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    GOSUB setSharedStubs ;*Stubs if any required for all test cases
+* set data for this test
+* set stubs for this test
+* addParameter
+     UTF.runTest("SCB.AUTH.OFI.SEC.TD.LOG.UPD")
+     UTF.assertTrue("TRUE")
+* doAssertions for this testcase
+
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> description of testcase2</desc>
+
+setSharedStubs:
+
+    STUB1 = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB1, UTF.any(), 'SEC.TRADE')
+    UTF.addStubParam(STUB1, UTF.any(),  'LR.OFI.TRD.REF')
+    UTF.addStubParam(STUB1, UTF.any(), '36')
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Set details common for all test cases>
+*** <desc> </desc>
+setSharedDetails:
+
+    FN.OFI.SEC.TD.LOG = 'F.SCB.OFI.SEC.TRADE.LOG'
+    F.OFI.SEC.TD.LOG = ''
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+END
