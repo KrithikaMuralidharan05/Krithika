@@ -1,0 +1,152 @@
+TESTCASE E.NOFILE.SCB.CORP.ACC.EXTRACT
+*-----------------------------------------------------------------------------
+* @author     :  
+*-----------------------------------------------------------------------------
+*
+*   Modification History :
+*
+*
+*-----------------------------------------------------------------------------
+	$INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.SECURITY.MASTER
+    $INSERT I_F.ENTITLEMENT
+    $INSERT I_F.DIARY
+    $INSERT I_F.SEC.ACC.MASTER
+    $INSERT I_F.CUSTOMER
+    $INSERT I_F.SC.PRE.DIARY
+    $INSERT I_F.SCB.CA.MASTER.LOG
+    $INSERT I_F.DEPT.ACCT.OFFICER
+    $INSERT I_F.COMPANY
+    $INSERT I_ENQUIRY.COMMON
+
+    UTF.setTarget("E.NOFILE.SCB.CORP.ACC.EXTRACT")    
+    UTF.setDescription("Test E.NOFILE.SCB.CORP.ACC.EXTRACT routine")
+    GOSUB runtest1   
+    GOSUB runtest2   
+    GOSUB runtest3
+    GOSUB runtest4                            
+    
+    RETURN
+runtest1:
+
+    UTF.reset() ;* Reset all
+	UTF.addParam("Param1")   
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs 
+	UTF.runTest("Testing by passing all the data and ID.COMPANY as SG1090400")
+    UTF.assertEquals(UTF.getNbInvocation(serviceCtrlStub), "0")
+
+RETURN
+
+runtest2:
+    
+    UTF.reset() ;* Reset all
+	UTF.addParam("Param1")   
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs 
+    ID.COMPANY = 'JE0010123'
+    R.DIARY<1> = 'ENT1'
+	R.DIARY<SC.DIA.NEW.PRICE> = '100'
+    R.DIARY<SC.DIA.OLD.RATIO> = '0.23'
+    R.DIARY<SC.DIA.NEW.RATIO> = '0.25'
+    UTF.setRecord("F.DIARY", '1234', R.DIARY)
+    
+    R.ENTITLEMENT<SC.ENT.RECORD.STATUS> = 'INAU'
+    R.ENTITLEMENT<SC.ENT.DATE.TIME> = '260108'
+    R.ENTITLEMENT<SC.ENT.NEW.SECURITY> = 'NEWSEC'
+    UTF.setRecord("F.ENTITLEMENT", 'ENT1', R.ENTITLEMENT)
+    
+    R.SC.PRE.DIARY<SC.PRD.LOCAL.REF,2> = '260108'
+    R.SC.PRE.DIARY<SC.PRD.LOCAL.REF,3> = '260108'
+    R.SC.PRE.DIARY<SC.PRD.LOCAL.REF,4> = '260108'
+    R.SC.PRE.DIARY<SC.PRD.LOCAL.REF,5> = '260108'
+    R.SC.PRE.DIARY<SC.PRD.LOCAL.REF,6> = '260108'
+    UTF.setRecord('F.SC.PRE.DIARY', 'SCPREDIA1', R.SC.PRE.DIARY)
+    
+	UTF.runTest("Testing by passing SC.PRE.DIARY data and ID.COMPANY as JE0010123")
+    DIARY.REC = UTF.getRecord("F.DIARY", '1234')
+    UTF.assertEquals(DIARY.REC<SC.DIA.NEW.PRICE>, "100")
+    
+RETURN
+
+runtest3:
+
+    UTF.reset() ;* Reset all
+	UTF.addParam("Param1")   
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs 
+    ID.COMPANY = 'GB0930264'
+	UTF.runTest("Testing by passing all the data and ID.COMPANY as GB0930264")
+    UTF.assertEquals(UTF.getNbInvocation(serviceCtrlStub), "1")
+
+RETURN
+
+runtest4:
+
+    UTF.reset() ;* Reset all
+	UTF.addParam("Param1")   
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs 
+    ID.COMPANY = 'HK1000215'
+	UTF.runTest("Testing by passing all the data and ID.COMPANY as HK1000215")
+    DIARY.REC = UTF.getRecord("F.DIARY", '1234')
+    UTF.assertEquals(DIARY.REC<SC.DIA.SC.PRE.DIARY.ID>, 'SCPREDIA1')
+
+RETURN
+
+
+
+setSharedStubs:
+	
+    refPos = '1':@FM:@FM:@VM'2':@VM:'3':@VM'4':@VM:'5':@VM:'6'
+    multiGetLocRefStub = UTF.addStub('MULTI.GET.LOC.REF')
+    UTF.addStubParam(multiGetLocRefStub,UTF.any(),UTF.same())
+    UTF.addStubParam(multiGetLocRefStub,UTF.any(),UTF.same())
+    UTF.addStubParam(multiGetLocRefStub,UTF.any(),refPos)
+    UTF.setRepeatable(multiGetLocRefStub)
+    
+    serviceCtrlStub = UTF.addStub("SERVICE.CONTROL")
+    UTF.addStubParam(serviceCtrlStub, UTF.any(), UTF.same())
+    UTF.addStubParam(serviceCtrlStub, UTF.any(), UTF.same())
+    UTF.addStubParam(serviceCtrlStub, UTF.any(), UTF.same())
+    
+    journalUpdate = UTF.addStub("JOURNAL.UPDATE")
+    UTF.addStubParam(journalUpdate,UTF.any(),UTF.same())
+    
+    ebrStub = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(ebrStub,UTF.any(),UTF.same())
+    UTF.addStubParam(ebrStub,UTF.any(),'1234')
+    UTF.addStubParam(ebrStub,UTF.any(),UTF.same())
+    UTF.addStubParam(ebrStub,UTF.any(),'1234')
+    UTF.addStubParam(ebrStub,UTF.any(),UTF.same())
+    
+    identifyCusSegStub = UTF.addStub('SCB.WM.C.IDENTIFY.CUST.SEG')
+    UTF.addStubParam(identifyCusSegStub,UTF.any(),UTF.same())
+    
+    getAllowedCusSegStub = UTF.addStub('SCB.GET.ALLOWED.CUST.SEG')
+    UTF.addStubParam(getAllowedCusSegStub,UTF.any(),UTF.same())
+    UTF.addStubParam(getAllowedCusSegStub,UTF.any(),UTF.same())
+    UTF.addStubParam(getAllowedCusSegStub,UTF.any(),UTF.same())
+    
+RETURN
+setSharedDetails:
+
+	ID.COMPANY = 'SG1090400'
+	D.FIELDS<1> = 'POSTING.DATE':@FM:'PAY.DATE'
+	D.RANGE.AND.VALUE<1> = '20260108':@FM:'20260108'
+    
+    R.DIARY<1> = 'ENT1'
+    R.DIARY<SC.DIA.SC.PRE.DIARY.ID> = 'SCPREDIA1'
+    UTF.setRecord("F.DIARY", '1234', R.DIARY)
+    UTF.setRecord("F.CONCAT.DIARY", '1234', 'ENT1')
+    
+    R.ENTITLEMENT<SC.ENT.PORTFOLIO.NO> = '100101-1'
+    R.ENTITLEMENT<SC.ENT.DATE.TIME> = '260108'
+    UTF.setRecord("F.ENTITLEMENT", 'ENT1', R.ENTITLEMENT)
+    
+    R.CUSTOMER<EB.CUS.LOCAL.REF,1> = '2'
+    UTF.setRecord('F.CUSTOMER', '100101', R.CUSTOMER)
+    
+RETURN
+END
