@@ -1,0 +1,130 @@
+TESTCASE SCB.INP.DEF.BR.AMT
+*-----------------------------------------------------------------------------
+* @author     :  
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.SEC.TRADE
+    $INSERT I_F.SEC.OPEN.ORDER
+    $INSERT I_F.SECURITY.MASTER
+*
+*   Modification History :
+*
+**
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+
+    UTF.setTarget("SCB.INP.DEF.BR.AMT")                    ;* Name of the Target routine for which test is done
+    UTF.setDescription("Input routine") ;* Default description for all tests  
+  GOSUB runtest1                                  ;* Meaningful description for testcase 1
+    GOSUB runtest2                                  ;* Meaningful description for testcase 2
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> description of testcase1</desc>
+
+runtest1:
+
+    UTF.reset() ;* Reset all
+
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    GOSUB setSharedStubs ;*Stubs if any required for all test cases
+* set data for this test
+* set stubs for this test
+* addParameter
+     UTF.runTest("Test the route from Airport to Sterling Office")
+* doAssertions for this testcase
+   UTF.assertTrue("TRUE")
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> description of testcase2</desc>
+
+
+setSharedStubs:
+  LOC.REF.STR.FLD = 'LWM.ST.GRP.ID'
+  LOC.REF.STR.POS = '1'
+  Y.LWM.ST.GRP.ID.POS = LOC.REF.STR.POS<1,1>
+
+    STUB.1 = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB.1, UTF.any(), "SECURITY.TRANSFER")
+    UTF.addStubParam(STUB.1, LOC.REF.STR.FLD,UTF.same()) 
+   UTF.addStubParam(STUB.1, UTF.any(),LOC.REF.STR.POS)
+ 
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Set details common for all test cases>
+*** <desc> </desc>
+setSharedDetails:
+*Y.LWM.ST.GRP.ID.POS = '152'
+*R.NEW(SC.STR.LOCAL.REF)<1,152> = "EQD.1.200836-000.6010.SGD.120.SEL.553.4931.20260727.20260729.20260728'
+*R.NEW(SC.STR.LOCAL.REF)<1,1> = "EQD.1.200836-000.6010.SGD.120.SEL.553.4931.20260727.20260729.20260728"
+
+R.NEW(SC.STR.LOCAL.REF)<1,152> = "EQD.1.200836-000.6010.SGD.120.SEL.553.4931.20260727.20260729.20260728"
+UTF.setRecord("F.SECURITY.TRANSFER",'SECTSC2601293104',R.NEW)
+TOT.GR.AMT = '100.10'
+    R.NEW(SC.STR.BR.NET.AMT) = '100.10'
+	R.NEW(SC.STR.CUST.NET.AMT) = '100.10'
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+runtest2:
+
+    UTF.reset() ;* Reset all
+
+    GOSUB setSharedDetails1 ;*Commons if any required for all test cases
+    GOSUB setSharedStubs1 ;*Stubs if any required for all test cases
+* set data for this test
+* set stubs for this test
+* addParameter
+     UTF.runTest("Test the route from Airport to Sterling Office")
+* doAssertions for this testcase
+   UTF.assertTrue("TRUE")
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> description of testcase2</desc>
+
+
+setSharedStubs1:
+  LOC.REF.STR.FLD = 'LWM.ST.GRP.ID'
+  LOC.REF.STR.POS = '1'
+  Y.LWM.ST.GRP.ID.POS = LOC.REF.STR.POS<1,1>
+
+    STUB.1 = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB.1, UTF.any(), "SECURITY.TRANSFER")
+    UTF.addStubParam(STUB.1, LOC.REF.STR.FLD,UTF.same()) 
+   UTF.addStubParam(STUB.1, UTF.any(),LOC.REF.STR.POS)
+ 
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Set details common for all test cases>
+*** <desc> </desc>
+setSharedDetails1:
+*Y.LWM.ST.GRP.ID.POS = '152'
+*R.NEW(SC.STR.LOCAL.REF)<1,152> = "EQD.1.200836-000.6010.SGD.120.SEL.553.4931.20260727.20260729.20260728'
+*R.NEW(SC.STR.LOCAL.REF)<1,1> = "EQD.1.200836-000.6010.SGD.120.SEL.553.4931.20260727.20260729.20260728"
+
+R.NEW(SC.STR.LOCAL.REF)<1,152> = "CONTRA.EQD.1.200836-000.6010.SGD.120.SEL.553.4931.20260727.20260729.20260728"
+UTF.setRecord("F.SECURITY.TRANSFER",'SECTSC2601293104',R.NEW)
+TOT.GR.AMT = '100.10'
+    R.NEW(SC.STR.BR.NET.AMT) = '100.10'
+	R.NEW(SC.STR.CUST.NET.AMT) = '100.10'
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+
+END
