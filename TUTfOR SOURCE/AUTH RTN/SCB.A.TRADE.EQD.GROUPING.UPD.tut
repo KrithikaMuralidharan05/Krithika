@@ -1,0 +1,213 @@
+TESTCASE SCB.A.TRADE.EQD.GROUPING.UPD
+*-----------------------------------------------------------------------------
+* @author     :
+*-----------------------------------------------------------------------------
+*
+*   Modification History :
+*
+*
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.SEC.TRADE
+    $INSERT I_F.SCB.PVB.EQD.GROUP.TODAY
+    $INSERT I_F.DATES
+    $INSERT I_F.SECURITY.MASTER
+    $INSERT I_F.CUSTOMER
+    $INSERT I_F.SCB.WM.H.LOCAL.PARAM
+
+    UTF.setTarget("SCB.A.TRADE.EQD.GROUPING.UPD")     ;* Name of the Target routine for which test is done
+    UTF.setDescription("Auth routine - groups equity trades into SCB.PVB.EQD.GROUP.TODAY")
+    GOSUB runtest1                                     ;* INAU - first trade for a group, group does not exist yet
+    GOSUB runtest2                                     ;* INAU - second trade joins an existing (not yet aggregated) group
+    GOSUB runtest3                                     ;* RNAU - reversal of the only trade in a group, group is deleted
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> New trade authorised (INAU), no existing group record -> a new group is created</desc>
+
+runtest1:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails      ;* Commons/positions/local param + security master data required for all test cases
+    GOSUB setSharedStubs        ;* MULTI.GET.LOC.REF stub required for all test cases
+* set data for this test
+    GOSUB setTradeCommon.INAU
+    ID.NEW = 'ST90001'
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID> = ''      ;* trade not linked to any group yet
+    GOSUB computeExpectedGrpId
+* set stubs for this test
+* addParameter
+    UTF.runTest("New group created for the first trade")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID)
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.SEC.TRADE.ID,1>, "ST90001")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.QUANTITY,1>, "1000")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.QTY>, "1000")
+    UTF.assertEquals(R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID>, Y.GRP.ID)
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> Second trade authorised (INAU) for the same group - group already exists and is
+            not yet linked to an aggregated transfer, so the trade is added to the existing
+            group and the aggregated quantity/stamp duty are incremented</desc>
+
+runtest2:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    GOSUB setTradeCommon.INAU
+    ID.NEW = 'ST90002'
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID> = ''
+    GOSUB computeExpectedGrpId
+* pre-existing group with one trade already included, not yet aggregated into a transfer
+    R.SCB.PVB.EQD.GROUP.TODAY = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID,1>       = 'ST90001'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.QUANTITY,1>           = '1000'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.QTY>        = '1000'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.STAMP.DUTY> = '1.00'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.SCB.PVB.EQD.GROUP.TODAY)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Second trade joins the existing group and updates aggregated qty")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID)
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.SEC.TRADE.ID,2>, "ST90002")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.QTY>, "2000")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase3>
+*** <desc> Reversal (RNAU) of the only trade in a group -> the group record is deleted
+            and the trade's local ref group id is cleared</desc>
+
+runtest3:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    GOSUB setTradeCommon.RNAU
+    ID.NEW = 'ST90001'
+    GOSUB computeExpectedGrpId
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID> = Y.GRP.ID    ;* trade currently linked to the group being reversed
+* pre-existing group containing only this one trade
+    R.SCB.PVB.EQD.GROUP.TODAY = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID,1>        = 'ST90001'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.QUANTITY,1>            = '1000'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.QTY>         = '1000'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.STAMP.DUTY>  = '1.00'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.SCB.PVB.EQD.GROUP.TODAY)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Reversal of the only trade deletes the group")
+* doAssertions for this testcase
+    UTF.assertEquals(R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID>, "")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Set trade data common to INAU/RNAU cases>
+*** <desc> </desc>
+
+setTradeCommon.INAU:
+    R.NEW(SC.SBS.RECORD.STATUS)      = 'INAU'
+    R.NEW(SC.SBS.SECURITY.CODE)      = 'SEC001'
+    R.NEW(SC.SBS.DEPOSITORY)         = '200836-000'
+    R.NEW(SC.SBS.TRADE.CCY)          = 'SGD'
+    R.NEW(SC.SBS.STOCK.EXCHANGE)     = '6010'
+    R.NEW(SC.SBS.CUST.TRANS.CODE)    = 'CUST001'
+    R.NEW(SC.SBS.CUST.PRICE)         = '120'
+    R.NEW(SC.SBS.TRADE.DATE)         = '20260727'
+    R.NEW(SC.SBS.VALUE.DATE)         = '20260729'
+    R.NEW(SC.SBS.BR.NO.NOM)          = '1000'
+    R.NEW(SC.SBS.BR.PRICE)           = '100'
+    R.NEW(SC.SBS.BR.GROSS.AM.TRD)    = '100.10'
+    R.NEW(SC.SBS.BR.FEES.MISC)       = '1.00'
+    R.NEW(SC.SBS.CUSTOMER.NO)        = '100101'
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.PVB.IND>       = '1'         ;* LWM.PVB.IND
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.LED.TKT.TYPE>  = 'FUND.WD'   ;* LED.TICKET.TYPE - must match local param below
+
+    RETURN
+
+setTradeCommon.RNAU:
+    GOSUB setTradeCommon.INAU
+    R.NEW(SC.SBS.RECORD.STATUS) = 'RNAU'
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Compute the same group id the routine will compute>
+*** <desc> Mirrors GROUP.ID.FORMATION in the target routine exactly, including today's date,
+            so the id used to set up/verify F.SCB.PVB.EQD.GROUP.TODAY records matches at run time</desc>
+
+computeExpectedGrpId:
+    Y.GRP.KEY = R.NEW(SC.SBS.SECURITY.CODE):".":R.NEW(SC.SBS.DEPOSITORY):".":R.NEW(SC.SBS.TRADE.CCY):".":R.NEW(SC.SBS.STOCK.EXCHANGE):".":R.NEW(SC.SBS.CUST.TRANS.CODE):".":R.NEW(SC.SBS.CUST.PRICE):".":R.NEW(SC.SBS.TRADE.DATE):".":R.NEW(SC.SBS.VALUE.DATE)
+    Y.DATE.TODAY = OCONV(DATE(),"D4/")
+    Y.CAL.DATE = Y.DATE.TODAY[7,4]:Y.DATE.TODAY[1,2]:Y.DATE.TODAY[4,2]
+    Y.GRP.ID = "EQD":".":R.NEW(SC.SBS.LOCAL.REF)<1,POS.PVB.IND>:".":Y.GRP.KEY:".":Y.CAL.DATE
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Stubs common for all test cases>
+*** <desc> Local ref positions below (30/31/32 for SEC.TRADE, 2 for CUSTOMER) are placeholders -
+            verify against the actual LWM.ST.GRP.ID/LWM.PVB.IND/LED.TICKET.TYPE/L.O.B positions
+            configured in your environment and adjust if different.</desc>
+
+setSharedStubs:
+    POS.ST.GRP.ID   = '30'
+    POS.PVB.IND     = '31'
+    POS.LED.TKT.TYPE = '32'
+    POS.LOB         = '2'
+
+    Y.APP.MATCH = 'SEC.TRADE':@FM:'CUSTOMER'
+    Y.FLD.MATCH = 'LWM.ST.GRP.ID':@VM:'LWM.PVB.IND':@VM:'LED.TICKET.TYPE':@FM:'L.O.B'
+    Y.LOC.POS.OUT = POS.ST.GRP.ID:@VM:POS.PVB.IND:@VM:POS.LED.TKT.TYPE:@FM:POS.LOB
+
+    STUB1 = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB1, Y.APP.MATCH, UTF.same())
+    UTF.addStubParam(STUB1, Y.FLD.MATCH, UTF.same())
+    UTF.addStubParam(STUB1, UTF.any(), Y.LOC.POS.OUT)
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Set details common for all test cases>
+*** <desc> Local param and security master records that drive the LED.TICKET.TYPE and
+            SAT.CODE checks; ID.COMPANY set to a non-JE, non-SG value so CHK.PVB.CUSTOMER
+            defaults Y.PVB.CUS.FLAG to '1' without needing to stub SCB.GET.ALLOWED.CUST.SEG</desc>
+
+setSharedDetails:
+
+    ID.COMPANY = 'GB0930264'
+
+    R.SCB.WM.H.LOCAL.PARAM = ''
+    R.SCB.WM.H.LOCAL.PARAM<SCBWM.PRM.FIELD.NAME,1>   = 'EQD.LED.TICKET.TYPE'
+    R.SCB.WM.H.LOCAL.PARAM<SCBWM.PRM.FIELD.VALUE,1,1> = 'FUND.WD'
+    R.SCB.WM.H.LOCAL.PARAM<SCBWM.PRM.FIELD.NAME,2>   = 'EQD.SAT.CODES'
+    R.SCB.WM.H.LOCAL.PARAM<SCBWM.PRM.FIELD.VALUE,2>  = 'EQ':@SM:'FI'
+    UTF.setRecord("F.SCB.WM.H.LOCAL.PARAM", 'EQD.STAMP.FUNDING.WITHDRAWAL', R.SCB.WM.H.LOCAL.PARAM)
+
+    R.SECURITY.MASTER = ''
+    R.SECURITY.MASTER<SC.SCM.SUB.ASSET.TYPE> = 'EQ'
+    UTF.setRecord("F.SECURITY.MASTER", 'SEC001', R.SECURITY.MASTER)
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+END
