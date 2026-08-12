@@ -1,0 +1,193 @@
+TESTCASE SCB.EQD.NOF.ENQ.ST.GRP
+*-----------------------------------------------------------------------------
+* @author     :
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_ENQUIRY.COMMON
+    $INSERT I_F.SCB.PVB.EQD.GROUP.TODAY
+    $INSERT I_F.SECURITY.TRANSFER
+    $INSERT I_F.STOCK.EXCHANGE
+    $INSERT I_F.DE.HEADER
+    $INSERT I_F.SEC.TRADE
+    $INSERT I_F.SECURITY.MASTER
+*
+*   Modification History :
+*
+**
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+
+    UTF.setTarget("SCB.EQD.NOF.ENQ.ST.GRP")                ;* Name of the Target routine for which test is done
+    UTF.setDescription("Enquiry routine - SCB.ENQ.TRADE.GROUP / NOFILE.SCB.ENQ.TRADE.GROUP")
+    GOSUB runtest1                                  ;* Group found, one included trade -> FINAL.ARRAY populated
+    GOSUB runtest2                                  ;* No group found for selection -> FINAL.ARRAY not populated
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> Trade date filter returns one group, with one included trade line</desc>
+
+runtest1:
+
+    UTF.reset() ;* Reset all
+
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    GOSUB setSharedStubs ;*Stubs if any required for all test cases
+* set data for this test
+    GOSUB setEnqCriteria.Test1
+* set stubs for this test
+    GOSUB setStubs.Test1
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParameter(FINAL.ARRAY)
+    UTF.runTest("Enquiry returns aggregated transfer with one included trade")
+* doAssertions for this testcase
+    UTF.assertTrue("TRUE")
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1 stubs and criteria>
+*** <desc> </desc>
+
+setEnqCriteria.Test1:
+    D.FIELDS<1> = 'TRADE.DATE'
+    D.RANGE.AND.VALUE<1> = '20260727'
+    D.LOGICAL.OPERANDS<1> = '1'
+    RETURN
+
+setStubs.Test1:
+*   EB.READLIST returns a single group id for the SSELECT built from D.FIELDS above
+    SEL.LIST.T1 = 'EQD.1.200836-000.6010.SGD.120'
+    SEL.CNT.T1  = '1'
+
+    STUB.SEL = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(STUB.SEL, UTF.any(), UTF.same())        ;* SEL.CMD (in)  - accept whatever command was built
+    UTF.addStubParam(STUB.SEL, SEL.LIST.T1, UTF.same())      ;* SEL.LIST (out)
+    UTF.addStubParam(STUB.SEL, UTF.any(), UTF.same())        ;* list name (in, blank)
+    UTF.addStubParam(STUB.SEL, SEL.CNT.T1, UTF.same())       ;* SEL.CNT (out)
+    UTF.addStubParam(STUB.SEL, UTF.any(), UTF.same())        ;* SEL.ERR (out)
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> No matching group for the given selection criteria</desc>
+
+runtest2:
+
+    UTF.reset() ;* Reset all
+
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    GOSUB setEnqCriteria.Test2
+* set stubs for this test
+    GOSUB setStubs.Test2
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParameter(FINAL.ARRAY)
+    UTF.runTest("Enquiry with no matching group returns empty FINAL.ARRAY")
+* doAssertions for this testcase
+    UTF.assertTrue("TRUE")
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2 stubs and criteria>
+*** <desc> </desc>
+
+setEnqCriteria.Test2:
+    D.FIELDS<1> = 'TRADE.DATE'
+    D.RANGE.AND.VALUE<1> = '20260101'
+    D.LOGICAL.OPERANDS<1> = '1'
+    RETURN
+
+setStubs.Test2:
+    STUB.SEL2 = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())       ;* SEL.CMD (in)
+    UTF.addStubParam(STUB.SEL2, '', UTF.same())              ;* SEL.LIST (out) - empty, nothing found
+    UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())       ;* list name (in, blank)
+    UTF.addStubParam(STUB.SEL2, '0', UTF.same())             ;* SEL.CNT (out)
+    UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())       ;* SEL.ERR (out)
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Set details common for all test cases>
+*** <desc> Records read directly via F.READ (SCB.PVB.EQD.GROUP.TODAY, SECURITY.TRANSFER,
+            SEC.TRADE, SECURITY.MASTER, STOCK.EXCHANGE) are seeded with UTF.setRecord.
+            MULTI.GET.LOC.REF is stubbed here since INIT calls it once regardless of testcase.</desc>
+
+setSharedDetails:
+
+*   -- Group record (SCB.PVB.EQD.GROUP.TODAY), id built as EQD.<seq>.<contra>.<depo>.<ccy>.<stkexch>
+    R.SCB.PVB.EQD.GROUP.TODAY = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.ERROR>                       = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID>                = 'ST12345'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>      = 'SECTSC2601293104'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.STATUS>           = 'AGGR'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AUTH.DATE>                   = '20260728'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.QUANTITY>                    = '1000'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.TRADE.DATE>                  = '20260727'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.VALUE.DATE>                  = '20260729'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD>            = '100.10'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.BR.MISC.FEE>                 = '1.00'
+*   -- no NOT.INCLUDED trades for this test data
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID.NOT.INCLUDED>   = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY",'EQD.1.200836-000.6010.SGD.120',R.SCB.PVB.EQD.GROUP.TODAY)
+
+*   -- Security transfer record
+    R.SECURITY.TRANSFER = ''
+    R.SECURITY.TRANSFER<SC.STR.NO.NOMINAL>       = '1000'
+    R.SECURITY.TRANSFER<SC.STR.BR.NET.AMT>       = '100.10'
+    R.SECURITY.TRANSFER<SC.STR.TRANSACTION.TYPE> = 'SEL'
+    R.SECURITY.TRANSFER<SC.STR.SECURITY.CCY>     = 'SGD'
+    R.SECURITY.TRANSFER<SC.STR.DELIVERY.KEY>     = ''
+    R.SECURITY.TRANSFER<SC.STR.LOCAL.REF,1>      = '1001234'      ;* position matches Y.LWM.POS stub below
+    UTF.setRecord("F.SECURITY.TRANSFER",'SECTSC2601293104',R.SECURITY.TRANSFER)
+
+*   -- Sec trade record
+    R.SEC.TRADE = ''
+    R.SEC.TRADE<SC.SBS.CUST.TRANS.CODE> = 'CUST001'
+    R.SEC.TRADE<SC.SBS.SECURITY.CODE>   = 'SEC001'
+    UTF.setRecord("F.SEC.TRADE",'ST12345',R.SEC.TRADE)
+
+*   -- Security master record
+    R.SECURITY.MASTER = ''
+    R.SECURITY.MASTER<SC.SCM.I.S.I.N.> = 'SG1234567890'
+    UTF.setRecord("F.SECURITY.MASTER",'SEC001',R.SECURITY.MASTER)
+
+*   -- Stock exchange record, code taken from position 6 of the group id (6010 above)
+    R.STOCK.EXCHANGE = ''
+    R.STOCK.EXCHANGE<SC.STE.DESCRIPTION,1> = 'SINGAPORE EXCHANGE'
+    UTF.setRecord("F.STOCK.EXCHANGE",'6010',R.STOCK.EXCHANGE)
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Stubs common for all test cases>
+*** <desc> </desc>
+
+setSharedStubs:
+*   MULTI.GET.LOC.REF(Y.APPLICATION,Y.FLD,Y.LOC.POS) called once in INIT for '97A.SAFE.FIAC'
+    LOC.REF.APP = 'SECURITY.TRANSFER'
+    LOC.REF.FLD = '97A.SAFE.FIAC'
+    LOC.REF.POS = '1'
+
+    STUB.1 = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB.1, UTF.any(), LOC.REF.APP)
+    UTF.addStubParam(STUB.1, LOC.REF.FLD, UTF.same())
+    UTF.addStubParam(STUB.1, UTF.any(), LOC.REF.POS)
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+
+END
