@@ -1,0 +1,203 @@
+TESTCASE E.SCB.NOFILE.SC.BLK.SEC.POS.ID
+*-----------------------------------------------------------------------------
+* @author     :
+*-----------------------------------------------------------------------------
+*
+*   Modification History :
+*
+*
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_ENQUIRY.COMMON
+    $INSERT I_F.SC.BLOCK.SEC.POS
+
+    UTF.setTarget("E.SCB.NOFILE.SC.BLK.SEC.POS.ID")
+    UTF.setDescription("Nofile enquiry - EQD Block/Unblock records for a given EFF.FROM.DATE")
+    GOSUB runtest1     ;* No EFF.FROM.DATE filter supplied -> PROCESS's IF Y.EFF.DATE branch never runs
+    GOSUB runtest2     ;* EFF.FROM.DATE supplied, live SC.BLOCK.SEC.POS record found - no history fallback
+    GOSUB runtest3     ;* EFF.FROM.DATE supplied, live selection empty -> falls back to the $HIS file
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> D.FIELDS has no EFF.FROM.DATE entry, so LOCATE fails, Y.EFF.DATE stays blank, and
+            PROCESS's entire IF Y.EFF.DATE THEN block is skipped - no EB.READLIST call at all</desc>
+
+runtest1:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    D.FIELDS = ''; D.RANGE.AND.VALUE = ''
+* addParameter
+    UTF.addParam("Param1")
+    UTF.runTest("No EFF.FROM.DATE filter supplied - nothing selected")
+* doAssertions for this testcase
+    UTF.assertEquals(UTF.getNbInvocation(locStub), "1")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> EFF.FROM.DATE supplied, EB.READLIST against the live SC.BLOCK.SEC.POS file returns
+            one id - Y.HIS.FLAG is never set, so the record is read via plain F.READ and the
+            history select/F.READ.HISTORY path is never touched</desc>
+
+runtest2:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    D.FIELDS = ''; D.RANGE.AND.VALUE = ''
+    D.FIELDS<1,1> = 'EFF.FROM.DATE'
+    D.RANGE.AND.VALUE<1> = '20260813'
+    GOSUB computeExpectedSelCmds
+
+    liveStub = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(liveStub, Y.SEL.CMD.LIVE, UTF.same())
+    UTF.addStubParam(liveStub, UTF.any(), 'BBLKSC2503400194')     ;* Y.SC.BLK.SEC.POS (out)
+    UTF.addStubParam(liveStub, UTF.any(), UTF.same())
+    UTF.addStubParam(liveStub, UTF.any(), '1')
+    UTF.addStubParam(liveStub, UTF.any(), UTF.same())
+
+    R.SC.BLOCK.SEC.POS = ''
+    R.SC.BLOCK.SEC.POS<SC.BSP.TRANSACTION.TYPE>              = 'BLK'
+    R.SC.BLOCK.SEC.POS<SC.BSP.LOCAL.REF,Y.L.BLK.TYPE.POS>     = 'MANUAL'
+    R.SC.BLOCK.SEC.POS<SC.BSP.SECURITY.CODE>                 = 'SEC001'
+    R.SC.BLOCK.SEC.POS<SC.BSP.SEC.DEPOT>                      = '200836-000'
+    R.SC.BLOCK.SEC.POS<SC.BSP.LOCAL.REF,Y.OPT.SM.ID.POS>      = 'OPTSEC01'
+    R.SC.BLOCK.SEC.POS<SC.BSP.CURR.AMT.BLOCKED>               = '1000'
+    R.SC.BLOCK.SEC.POS<SC.BSP.NEW.AMT.BLOCKED>                = '1500'
+    R.SC.BLOCK.SEC.POS<SC.BSP.EFF.FROM.DATE>                  = '20260813'
+    R.SC.BLOCK.SEC.POS<SC.BSP.BLOCKED.UNTIL>                  = ''
+    R.SC.BLOCK.SEC.POS<SC.BSP.EFF.TO.DATE>                    = ''
+    R.SC.BLOCK.SEC.POS<SC.BSP.ADDITION.INFO>                  = 'Manual block for margin call'
+    R.SC.BLOCK.SEC.POS<SC.BSP.LOCAL.REF,Y.LWM.SECTR.ID.POS>   = 'SECTR01'
+    R.SC.BLOCK.SEC.POS<SC.BSP.RECORD.STATUS>                  = 'INAU'
+    R.SC.BLOCK.SEC.POS<SC.BSP.INPUTTER,1>                     = 'USER1'
+    R.SC.BLOCK.SEC.POS<SC.BSP.AUTHORISER,1>                   = 'USER2'
+    R.SC.BLOCK.SEC.POS<SC.BSP.DATE.TIME,1>                    = '260813120000'
+    R.SC.BLOCK.SEC.POS<SC.BSP.SECURITIES.ACCOUNT,1>           = '100101-1'
+    UTF.setRecord("F.SC.BLOCK.SEC.POS", 'BBLKSC2503400194', R.SC.BLOCK.SEC.POS)
+
+* addParameter
+    UTF.addParam("Param1")
+    UTF.runTest("Live SC.BLOCK.SEC.POS record found for the given EFF.FROM.DATE")
+* doAssertions for this testcase
+    UTF.assertEquals(UTF.getNbInvocation(liveStub), "1")
+    TRD.REC = UTF.getRecord("F.SC.BLOCK.SEC.POS", 'BBLKSC2503400194')
+    UTF.assertEquals(TRD.REC<SC.BSP.TRANSACTION.TYPE>, "BLK")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase3>
+*** <desc> EFF.FROM.DATE supplied, live EB.READLIST returns nothing -> falls back to a select
+            against F.SC.BLOCK.SEC.POS$HIS, Y.HIS.FLAG is set, the returned id carries a ';'
+            suffix which FIELD() strips before CALL F.READ.HISTORY reads the record</desc>
+
+runtest3:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    D.FIELDS = ''; D.RANGE.AND.VALUE = ''
+    D.FIELDS<1,1> = 'EFF.FROM.DATE'
+    D.RANGE.AND.VALUE<1> = '20260813'
+    GOSUB computeExpectedSelCmds
+
+    liveStub2 = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(liveStub2, Y.SEL.CMD.LIVE, UTF.same())
+    UTF.addStubParam(liveStub2, UTF.any(), '')          ;* nothing found live
+    UTF.addStubParam(liveStub2, UTF.any(), UTF.same())
+    UTF.addStubParam(liveStub2, UTF.any(), '0')
+    UTF.addStubParam(liveStub2, UTF.any(), UTF.same())
+
+    hisStub = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(hisStub, Y.SEL.CMD.HIS, UTF.same())
+    UTF.addStubParam(hisStub, UTF.any(), 'BBLKSC2503400209;1')    ;* id carries a version suffix
+    UTF.addStubParam(hisStub, UTF.any(), UTF.same())
+    UTF.addStubParam(hisStub, UTF.any(), '1')
+    UTF.addStubParam(hisStub, UTF.any(), UTF.same())
+
+*   CALL F.READ.HISTORY(FN.SC.BLOCK.SEC.POS.HIS,Y.SC.BLK.SEC.POS.ID,R.SC.BLOCK.SEC.POS,F.SC.BLOCK.SEC.POS.HIS,Y.SC.BLOCK.SEC.HIS.ERR)
+*   stubbed explicitly since - like F.RELEASE seen with other routines - it is not auto-mocked
+*   the way plain F.READ is; remove this stub if your environment does auto-mock it via
+*   UTF.setRecord on the $HIS file instead
+    R.SC.BLOCK.SEC.POS.HIS = ''
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.TRANSACTION.TYPE>              = 'UBLK'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.LOCAL.REF,Y.L.BLK.TYPE.POS>    = 'AUTO'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.SECURITY.CODE>                 = 'SEC002'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.SEC.DEPOT>                      = '200836-000'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.LOCAL.REF,Y.OPT.SM.ID.POS>     = 'OPTSEC02'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.CURR.AMT.BLOCKED>              = '2000'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.NEW.AMT.BLOCKED>               = '0'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.EFF.FROM.DATE>                 = '20260813'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.BLOCKED.UNTIL>                 = '20260820'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.EFF.TO.DATE>                   = '20260813'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.ADDITION.INFO>                 = 'Auto unblock at maturity'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.LOCAL.REF,Y.LWM.SECTR.ID.POS>  = 'SECTR02'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.RECORD.STATUS>                 = 'RNAU'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.INPUTTER,1>                    = 'USER3'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.AUTHORISER,1>                  = 'USER4'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.DATE.TIME,1>                   = '260813150000'
+    R.SC.BLOCK.SEC.POS.HIS<SC.BSP.SECURITIES.ACCOUNT,1>          = '100102-1'
+
+    hisReadStub = UTF.addStub("F.READ.HISTORY")
+    UTF.addStubParam(hisReadStub, UTF.any(), UTF.same())          ;* FN.SC.BLOCK.SEC.POS.HIS (in)
+    UTF.addStubParam(hisReadStub, 'BBLKSC2503400209', UTF.same()) ;* id, after FIELD() strips ';1'
+    UTF.addStubParam(hisReadStub, UTF.any(), R.SC.BLOCK.SEC.POS.HIS)  ;* R.SC.BLOCK.SEC.POS (out)
+    UTF.addStubParam(hisReadStub, UTF.any(), UTF.same())
+    UTF.addStubParam(hisReadStub, UTF.any(), UTF.same())
+
+* addParameter
+    UTF.addParam("Param1")
+    UTF.runTest("Live selection empty - falls back to the $HIS file and strips the ';' suffix")
+* doAssertions for this testcase
+    UTF.assertEquals(UTF.getNbInvocation(liveStub2), "1")
+    UTF.assertEquals(UTF.getNbInvocation(hisStub), "1")
+    UTF.assertEquals(UTF.getNbInvocation(hisReadStub), "1")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Compute the same SEL.CMD strings the routine builds>
+*** <desc> Mirrors the concatenation in PROCESS exactly (same FN.* constants and Y.EFF.DATE),
+            so the EB.READLIST stubs match on the precise command text used at run time</desc>
+
+computeExpectedSelCmds:
+    FN.SC.BLOCK.SEC.POS     = 'F.SC.BLOCK.SEC.POS'
+    FN.SC.BLOCK.SEC.POS.HIS = 'F.SC.BLOCK.SEC.POS$HIS'
+    Y.EFF.DATE = D.RANGE.AND.VALUE<1>
+
+    Y.SEL.CMD.LIVE = 'SELECT ':FN.SC.BLOCK.SEC.POS:' WITH L.OPTION.SM.ID NE "" AND EFF.FROM.DATE EQ ':Y.EFF.DATE
+    Y.SEL.CMD.HIS  = 'SELECT ':FN.SC.BLOCK.SEC.POS.HIS:' WITH L.OPTION.SM.ID NE "" AND EFF.FROM.DATE EQ ':Y.EFF.DATE
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Stubs common for all test cases>
+*** <desc> Local ref positions below (15/16/17 for L.BLOCK.TYPE/L.OPTION.SM.ID/LWM.SECTR.ID
+            on SC.BLOCK.SEC.POS) are placeholders - verify against your environment's actual
+            positions and adjust if different</desc>
+
+setSharedStubs:
+    Y.L.BLK.TYPE.POS   = '15'
+    Y.OPT.SM.ID.POS    = '16'
+    Y.LWM.SECTR.ID.POS = '17'
+
+    locStub = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(locStub, "SC.BLOCK.SEC.POS", UTF.same())
+    UTF.addStubParam(locStub, 'L.BLOCK.TYPE':@VM:'L.OPTION.SM.ID':@VM:'LWM.SECTR.ID', UTF.same())
+    UTF.addStubParam(locStub, UTF.any(), Y.L.BLK.TYPE.POS:@VM:Y.OPT.SM.ID.POS:@VM:Y.LWM.SECTR.ID.POS)
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+END
