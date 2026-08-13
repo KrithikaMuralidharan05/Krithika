@@ -23,6 +23,11 @@ TESTCASE SCB.A.TRADE.EQD.GROUPING.UPD
     GOSUB runtest1                                     ;* INAU - first trade for a group, group does not exist yet
     GOSUB runtest2                                     ;* INAU - second trade joins an existing (not yet aggregated) group
     GOSUB runtest3                                     ;* RNAU - reversal of the only trade in a group, group is deleted
+    GOSUB runtest4                                     ;* INAU - group already linked to an aggregated transfer -> trade goes to NOT.INCLUDED
+    GOSUB runtest5                                     ;* RNAU - group already linked to an aggregated transfer -> trade marked -R, not deleted
+    GOSUB runtest6                                     ;* RNAU - partial removal from a group with more than one trade
+    GOSUB runtest7                                     ;* RNAU - trade being reversed is only in the NOT.INCLUDED list
+    GOSUB runtest8                                     ;* INAU - SG customer segment check (CHK.PVB.CUSTOMER)
 *
     RETURN
 *** </region>
@@ -114,6 +119,168 @@ runtest3:
     UTF.runTest("Reversal of the only trade deletes the group")
 * doAssertions for this testcase
     UTF.assertEquals(R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID>, "")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase4>
+*** <desc> INAU - group already linked to an aggregated transfer (AGGREGATED.TRANSFER.ID
+            is set) -> the trade is written to the NOT.INCLUDED side instead of the main list
+            and the aggregated totals are left untouched</desc>
+
+runtest4:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    GOSUB setTradeCommon.INAU
+    ID.NEW = 'ST90003'
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID> = ''
+    GOSUB computeExpectedGrpId
+    R.SCB.PVB.EQD.GROUP.TODAY = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID,1>          = 'ST90001'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>  = 'SECTSC2601293104'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.QTY>          = '1000'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.SCB.PVB.EQD.GROUP.TODAY)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Trade added to NOT.INCLUDED list when group already linked to an aggregated transfer")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID)
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.SEC.TRADE.ID.NOT.INCLUDED,1>, "ST90003")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.QTY>, "1000")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase5>
+*** <desc> RNAU - group already linked to an aggregated transfer -> the reversed trade is
+            marked with a '-R' suffix in place, the group is NOT deleted</desc>
+
+runtest5:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    GOSUB setTradeCommon.RNAU
+    ID.NEW = 'ST90001'
+    GOSUB computeExpectedGrpId
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID> = Y.GRP.ID
+    R.SCB.PVB.EQD.GROUP.TODAY = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID,1>          = 'ST90001'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>  = 'SECTSC2601293104'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.QTY>          = '1000'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.SCB.PVB.EQD.GROUP.TODAY)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Reversal of a trade already linked to an aggregated transfer marks it -R instead of deleting")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID)
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.SEC.TRADE.ID,1>, "ST90001-R")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase6>
+*** <desc> RNAU - group has more than one trade, only one is reversed -> the ELSE branch
+            (DEL of the specific value position, decrement of aggregated qty/stamp duty)
+            runs instead of a full group delete</desc>
+
+runtest6:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    GOSUB setTradeCommon.RNAU
+    ID.NEW = 'ST90002'                                     ;* reversing the second of two trades
+    GOSUB computeExpectedGrpId
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID> = Y.GRP.ID
+*   this trade's nominal/fees must match what was used to build the group totals below
+    R.NEW(SC.SBS.BR.NO.NOM)    = '500'
+    R.NEW(SC.SBS.BR.FEES.MISC) = '0.50'
+    R.SCB.PVB.EQD.GROUP.TODAY = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID,1>          = 'ST90001'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID,2>          = 'ST90002'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.QUANTITY,1>              = '1000'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.QUANTITY,2>              = '500'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>  = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.QTY>          = '1500'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.STAMP.DUTY>   = '1.50'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.SCB.PVB.EQD.GROUP.TODAY)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Partial removal - reversing one of several trades decrements the aggregated totals")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID)
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.QTY>, "1000")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.STAMP.DUTY>, "1.00")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.SEC.TRADE.ID,2>, "")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase7>
+*** <desc> RNAU - the trade being reversed is not in the main SEC.TRADE.ID list at all,
+            only in SEC.TRADE.ID.NOT.INCLUDED -> exercises the second FINDSTR block</desc>
+
+runtest7:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    GOSUB setTradeCommon.RNAU
+    ID.NEW = 'ST90099'
+    GOSUB computeExpectedGrpId
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID> = Y.GRP.ID
+    R.SCB.PVB.EQD.GROUP.TODAY = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID,1>              = 'ST90001'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>      = ''
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.QTY>              = '1000'
+    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID.NOT.INCLUDED,1> = 'ST90099'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.SCB.PVB.EQD.GROUP.TODAY)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Reversal of a trade recorded only in the NOT.INCLUDED list removes it from that list")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID)
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.SEC.TRADE.ID.NOT.INCLUDED,1>, "")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase8>
+*** <desc> INAU - ID.COMPANY starts with 'SG' -> exercises CHK.PVB.CUSTOMER's SG branch
+            (SCB.GET.ALLOWED.CUST.SEG + F.READ on F.CUSTOMER); allowed LOB matches the
+            customer's LOB so the trade is grouped normally</desc>
+
+runtest8:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    GOSUB setTradeCommon.INAU
+    ID.COMPANY = 'SG1090400'
+    ID.NEW = 'ST90004'
+    R.NEW(SC.SBS.LOCAL.REF)<1,POS.ST.GRP.ID> = ''
+    GOSUB computeExpectedGrpId
+    R.CUSTOMER = ''
+    R.CUSTOMER<EB.CUS.LOCAL.REF,POS.LOB> = 'RETAIL'
+    UTF.setRecord("F.CUSTOMER", '100101', R.CUSTOMER)
+* set stubs for this test
+    STUB.SEG = UTF.addStub("SCB.GET.ALLOWED.CUST.SEG")
+    UTF.addStubParam(STUB.SEG, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.SEG, "PVB", UTF.same())
+    UTF.addStubParam(STUB.SEG, UTF.any(), "RETAIL")
+* addParameter
+    UTF.runTest("SG customer segment check - allowed LOB matches, trade is grouped normally")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID)
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.SEC.TRADE.ID,1>, "ST90004")
 
 RETURN
 *** </region>
