@@ -183,6 +183,14 @@ setSharedStubs:
     UTF.addStubParam(STUB1, Y.FLD.MATCH, UTF.same())
     UTF.addStubParam(STUB1, UTF.any(), Y.LOC.POS.OUT)
 
+*   CALL F.RELEASE(FN.SCB.PVB.EQD.GROUP.TODAY,Y.GRP.ID,R.SCB.PVB.EQD.GROUP.TODAY) runs
+*   unconditionally at the end of PROCESS - stub it as a no-op release
+    STUB.REL = UTF.addStub("F.RELEASE")
+    UTF.addStubParam(STUB.REL, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.REL, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.REL, UTF.any(), UTF.same())
+    UTF.setRepeatable(STUB.REL)
+
     RETURN
 
 *** </region>
