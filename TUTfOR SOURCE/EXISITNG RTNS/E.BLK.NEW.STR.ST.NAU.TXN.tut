@@ -1,0 +1,354 @@
+TESTCASE E.BLK.NEW.STR.ST.NAU.TXN
+*-----------------------------------------------------------------------------
+* @author     :
+*-----------------------------------------------------------------------------
+*
+*   Modification History :
+*
+*
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_ENQUIRY.COMMON
+    $INSERT I_F.SECURITY.TRANSFER
+    $INSERT I_F.SEC.TRADE
+    $INSERT I_F.SECURITY.MASTER
+    $INSERT I_F.SECURITY.SUPP
+    $INSERT I_F.CUSTOMER
+
+    UTF.setTarget("E.BLK.NEW.STR.ST.NAU.TXN")
+    UTF.setDescription("Nofile enquiry - blocked/new equity NAU transactions from SECURITY.TRANSFER & SEC.TRADE")
+    GOSUB runtest1     ;* NEW.TXNS - SECURITY.TRANSFER path, OPTION SM branch (Y.SUB.ASSET EQ security's own SAT)
+    GOSUB runtest2     ;* FIX.TRADE - SEC.TRADE path, UNDERLYING SM branch, no ST15 override
+    GOSUB runtest3     ;* FIX.TRADE.ST15 - SEC.TRADE path, OPTION SM branch, WITH ST15 override
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> ENQ.NAME = SCB.BLK.EQD.NAU.NEW.TXNS. This enquiry name matches the NEW.TXNS
+            pattern in BOTH SEC.TRD.SEL.LIST and SEC.TRFR.SEL.LIST, so two distinct
+            EB.READLIST commands are built and stubbed separately. The trade-side list is
+            left empty here (SEC.TRD.PROCESS never calls BUILD.RETURN.ARRAY for a NEW.TXNS
+            enquiry name anyway, since that gosub only fires for FIX.TRADE/FIX.TRADE.ST15) -
+            this test exercises the SECURITY.TRANSFER "OPTION SM" branch only, where the
+            traded security's own SUB.ASSET.TYPE equals the configured Y.SUB.ASSET</desc>
+
+runtest1:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    ENQ.SELECTION<1> = 'SCB.BLK.EQD.NAU.NEW.TXNS'
+    GOSUB computeExpectedSelCmds
+
+    trdStub = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(trdStub, Y.SEL.CMD.TRD.NEW, UTF.same())
+    UTF.addStubParam(trdStub, UTF.any(), '')          ;* SC.TRD.LIST (out) - empty, skip SEC.TRD.PROCESS output
+    UTF.addStubParam(trdStub, UTF.any(), UTF.same())
+    UTF.addStubParam(trdStub, UTF.any(), '0')
+    UTF.addStubParam(trdStub, UTF.any(), UTF.same())
+
+    trfrStub = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(trfrStub, Y.SEL.CMD.TRFR.NEW, UTF.same())
+    UTF.addStubParam(trfrStub, UTF.any(), 'SECTSC2601293104')  ;* KEY.LIST (out)
+    UTF.addStubParam(trfrStub, UTF.any(), UTF.same())
+    UTF.addStubParam(trfrStub, UTF.any(), '1')
+    UTF.addStubParam(trfrStub, UTF.any(), UTF.same())
+
+    R.SECURITY.TRANSFER = ''
+    R.SECURITY.TRANSFER<SC.STR.LOCAL.REF,STR.TRD.POS>      = ''            ;* not 'MODIFIED'
+    R.SECURITY.TRANSFER<SC.STR.SECURITY.NO>                = 'SEC001'
+    R.SECURITY.TRANSFER<SC.STR.CUSTOMER.NO>                = '100101'
+    R.SECURITY.TRANSFER<SC.STR.DEPOSITORY>                 = '200836-000'
+    R.SECURITY.TRANSFER<SC.STR.SECURITY.CCY>               = 'SGD'
+    R.SECURITY.TRANSFER<SC.STR.TRANSACTION.TYPE>           = 'SEL'
+    R.SECURITY.TRANSFER<SC.STR.NO.NOMINAL>                 = '1000'
+    R.SECURITY.TRANSFER<SC.STR.LOCAL.REF,TRFR.TICKET.TYP.POS> = 'FUND.WD'
+    R.SECURITY.TRANSFER<SC.STR.RECORD.STATUS>              = 'INAU'
+    R.SECURITY.TRANSFER<SC.STR.DATE.TIME>                  = '260813120000'
+    R.SECURITY.TRANSFER<SC.STR.CUST.REMARKS,1>             = 'NEW TRADE'
+    R.SECURITY.TRANSFER<SC.STR.BR.NET.AMT>                 = '100.10'
+    R.SECURITY.TRANSFER<SC.STR.LOCAL.REF,STR.UBLK.POS,1>   = 'BLK001'      ;* main BLK fields blank -> falls back to UBLK
+    R.SECURITY.TRANSFER<SC.STR.LOCAL.REF,STR.UBLK.Q.POS,1> = '500'
+    R.SECURITY.TRANSFER<SC.STR.TRADE.DATE>                 = '20260727'
+    R.SECURITY.TRANSFER<SC.STR.VALUE.DATE>                 = '20260729'
+    R.SECURITY.TRANSFER<SC.STR.SECURITY.ACC>               = 'ACC001'
+    R.SECURITY.TRANSFER<SC.STR.OVERRIDE>                   = ''            ;* no override on this run
+    R.SECURITY.TRANSFER<SC.STR.INPUTTER,1>                 = 'USER1'
+    R.SECURITY.TRANSFER<SC.STR.AUTHORISER>                 = 'USER2'
+    UTF.setRecord("F.SECURITY.TRANSFER$NAU", 'SECTSC2601293104', R.SECURITY.TRANSFER)
+
+    R.SECURITY.MASTER = ''
+    R.SECURITY.MASTER<SC.SCM.SUB.ASSET.TYPE> = 'EQ'          ;* equals Y.SUB.ASSET -> OPTION SM branch
+    R.SECURITY.MASTER<SC.SCM.SHORT.NAME>     = 'SEC001 SHORT NAME'
+    UTF.setRecord("F.SECURITY.MASTER", 'SEC001', R.SECURITY.MASTER)
+
+    R.SECURITY.SUPP = ''
+    R.SECURITY.SUPP<SC.SSP.LOCAL.REF,UNDER.SM.POS>  = 'UNDSEC01'
+    R.SECURITY.SUPP<SC.SSP.LOCAL.REF,STRIKE.POS>    = '150.00'
+    R.SECURITY.SUPP<SC.SSP.LOCAL.REF,NOTIONAL.POS>  = '100000'
+    UTF.setRecord("F.SECURITY.SUPP", 'SEC001', R.SECURITY.SUPP)
+
+    R.SECURITY.MASTER.ULY = ''
+    R.SECURITY.MASTER.ULY<SC.SCM.SHORT.NAME> = 'UNDERLYING NAME'
+    UTF.setRecord("F.SECURITY.MASTER", 'UNDSEC01', R.SECURITY.MASTER.ULY)
+
+    R.CUSTOMER = ''
+    R.CUSTOMER<EB.CUS.LOCAL.REF,Y.PAPLESS.ADV.POS> = 'Y'
+    UTF.setRecord("F.CUSTOMER", '100101', R.CUSTOMER)
+
+* addParameter
+    UTF.addParam("Param1")
+    UTF.runTest("NEW.TXNS enquiry builds return array from the SECURITY.TRANSFER OPTION SM path")
+* doAssertions for this testcase
+    UTF.assertEquals(UTF.getNbInvocation(trdStub), "1")
+    UTF.assertEquals(UTF.getNbInvocation(trfrStub), "1")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> ENQ.NAME = SCB.BLK.EQD.NAU.FIX.TRADE. Matches only the SEC.TRD.SEL.LIST FIX.TRADE
+            pattern; ENQ.NAME does not match either SEC.TRFR.SEL.LIST pattern, so SEL.CMD is
+            left at whatever SEC.TRD.SEL.LIST set it to and EB.READLIST is called a second
+            time with that same (stale) command - the same stub below covers both calls, and
+            the resulting SEC.TRFR.PROCESS pass is a harmless no-op since 'ST90001' does not
+            exist under F.SECURITY.TRANSFER$NAU. This exercises the "UNDERLYING SM" branch of
+            SEC.TRD.PROCESS (traded security's SAT differs from Y.SUB.ASSET, but the security
+            referenced via LED.OPT.SM.ID matches it), with no ST15 override present</desc>
+
+runtest2:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    ENQ.SELECTION<1> = 'SCB.BLK.EQD.NAU.FIX.TRADE'
+    GOSUB computeExpectedSelCmds
+
+    trdStub2 = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(trdStub2, Y.SEL.CMD.TRD.FIX, UTF.same())
+    UTF.addStubParam(trdStub2, UTF.any(), 'ST90001')
+    UTF.addStubParam(trdStub2, UTF.any(), UTF.same())
+    UTF.addStubParam(trdStub2, UTF.any(), '1')
+    UTF.addStubParam(trdStub2, UTF.any(), UTF.same())
+    UTF.setRepeatable(trdStub2)          ;* also covers the reused/stale call from SEC.TRFR.SEL.LIST
+
+    R.SEC.TRADE = ''
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,ST.TRD.POS>      = ''              ;* not 'MODIFIED'
+    R.SEC.TRADE<SC.SBS.SECURITY.CODE>             = 'SEC002'
+    R.SEC.TRADE<SC.SBS.CUSTOMER.NO>               = '100101'
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,OPT.SM.POS>      = 'OPTSEC02'
+    R.SEC.TRADE<SC.SBS.SECURITY.CURRENCY>         = 'SGD'
+    R.SEC.TRADE<SC.SBS.CUST.TRANS.CODE>           = 'BUY'
+    R.SEC.TRADE<SC.SBS.CUST.NO.NOM>               = '2000'
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,TRD.TICKET.TYP.POS> = 'FUND.WD'
+    R.SEC.TRADE<SC.SBS.RECORD.STATUS>             = 'INAU'
+    R.SEC.TRADE<SC.SBS.DATE.TIME>                 = '260813130000'
+    R.SEC.TRADE<SC.SBS.CU.NARRATIVE,1>            = 'FIX TRADE'          ;* does not start with 'NEW' -> Y.NOTIONAL stays blank
+    R.SEC.TRADE<SC.SBS.TRADE.DATE>                = '20260727'
+    R.SEC.TRADE<SC.SBS.VALUE.DATE>                = '20260729'
+    R.SEC.TRADE<SC.SBS.CUST.SEC.ACC>              = 'ACC002'
+    R.SEC.TRADE<SC.SBS.CU.GROSS.AM.TRD>           = '200.20'
+    R.SEC.TRADE<SC.SBS.CU.NET.AM.TRD>             = '198.00'
+    R.SEC.TRADE<SC.SBS.DEPOSITORY>                = '200836-000'
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,SUB.ACC.POS>     = 'SUBACC1'
+    R.SEC.TRADE<SC.SBS.BR.ACC.NO>                 = 'BR001'
+    R.SEC.TRADE<SC.SBS.BR.GROSS.AM.TRD>           = '199.00'
+    R.SEC.TRADE<SC.SBS.BR.NET.AM.TRD>             = '150.00'
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,ST.BLK.POS>      = 'BLKX01'             ;* main BLK fields present, no UBLK fallback
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,ST.BLK.Q.POS>    = '300'
+    R.SEC.TRADE<SC.SBS.OVERRIDE>                  = ''                   ;* no override -> Y.ST.FLAG stays unset
+    R.SEC.TRADE<SC.SBS.INPUTTER,1>                = 'USER3'
+    R.SEC.TRADE<SC.SBS.AUTHORISER>                = 'USER4'
+    UTF.setRecord("F.SEC.TRADE$NAU", 'ST90001', R.SEC.TRADE)
+
+    R.SECURITY.MASTER = ''
+    R.SECURITY.MASTER<SC.SCM.SUB.ASSET.TYPE> = 'FI'              ;* differs from Y.SUB.ASSET='EQ' -> UNDERLYING SM branch
+    R.SECURITY.MASTER<SC.SCM.SHORT.NAME>     = 'SEC002 SHORT NAME'
+    UTF.setRecord("F.SECURITY.MASTER", 'SEC002', R.SECURITY.MASTER)
+
+    R.SECURITY.SUPP = ''
+    R.SECURITY.SUPP<SC.SSP.LOCAL.REF,STRIKE.POS> = '75.50'
+    UTF.setRecord("F.SECURITY.SUPP", 'OPTSEC02', R.SECURITY.SUPP)
+
+    R.SECURITY.MASTER.OPT = ''
+    R.SECURITY.MASTER.OPT<SC.SCM.SUB.ASSET.TYPE> = 'EQ'          ;* equals Y.SUB.ASSET -> enters the inner IF
+    R.SECURITY.MASTER.OPT<SC.SCM.SHORT.NAME>     = 'OPT SHORT NAME 2'
+    UTF.setRecord("F.SECURITY.MASTER", 'OPTSEC02', R.SECURITY.MASTER.OPT)
+
+    R.CUSTOMER = ''
+    R.CUSTOMER<EB.CUS.LOCAL.REF,Y.PAPLESS.ADV.POS> = 'Y'
+    UTF.setRecord("F.CUSTOMER", '100101', R.CUSTOMER)
+
+* addParameter
+    UTF.addParam("Param1")
+    UTF.runTest("FIX.TRADE enquiry builds return array from the SEC.TRADE UNDERLYING SM path (no ST15)")
+* doAssertions for this testcase
+    UTF.assertEquals(UTF.getNbInvocation(trdStub2), "2")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase3>
+*** <desc> ENQ.NAME = SCB.BLK.EQD.NAU.FIX.TRADE.ST15. Same stale-SEL.CMD reuse pattern as
+            testcase2. This exercises the "OPTION SM" branch of SEC.TRD.PROCESS together with
+            an ST15 override, so FINDSTR 'ST15' IN Y.OVERRIDES matches and the ST15-specific
+            BUILD.RETURN.ARRAY branch fires. CALL TXT is stubbed as a no-op since the override
+            text here deliberately avoids the ~ { } * characters PROCESS.OVERRIDES rewrites, so
+            'ST15' survives untouched through to Y.OVERRIDES</desc>
+
+runtest3:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    ENQ.SELECTION<1> = 'SCB.BLK.EQD.NAU.FIX.TRADE.ST15'
+    GOSUB computeExpectedSelCmds
+
+    trdStub3 = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(trdStub3, Y.SEL.CMD.TRD.FIX.ST15, UTF.same())
+    UTF.addStubParam(trdStub3, UTF.any(), 'ST90002')
+    UTF.addStubParam(trdStub3, UTF.any(), UTF.same())
+    UTF.addStubParam(trdStub3, UTF.any(), '1')
+    UTF.addStubParam(trdStub3, UTF.any(), UTF.same())
+    UTF.setRepeatable(trdStub3)
+
+    txtStub = UTF.addStub("TXT")
+    UTF.addStubParam(txtStub, UTF.any(), UTF.same())
+    UTF.setRepeatable(txtStub)
+
+    R.SEC.TRADE = ''
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,ST.TRD.POS>      = ''
+    R.SEC.TRADE<SC.SBS.SECURITY.CODE>             = 'SEC003'
+    R.SEC.TRADE<SC.SBS.CUSTOMER.NO>               = '100101'
+    R.SEC.TRADE<SC.SBS.SECURITY.CURRENCY>         = 'SGD'
+    R.SEC.TRADE<SC.SBS.CUST.TRANS.CODE>           = 'SEL'
+    R.SEC.TRADE<SC.SBS.CUST.NO.NOM>               = '1500'
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,TRD.TICKET.TYP.POS> = 'FUND.WD'
+    R.SEC.TRADE<SC.SBS.RECORD.STATUS>             = 'INAU'
+    R.SEC.TRADE<SC.SBS.DATE.TIME>                 = '260813140000'
+    R.SEC.TRADE<SC.SBS.CU.NARRATIVE,1>            = 'NEW OPTION'         ;* starts with 'NEW' -> Y.NOTIONAL populated
+    R.SEC.TRADE<SC.SBS.TRADE.DATE>                = '20260727'
+    R.SEC.TRADE<SC.SBS.VALUE.DATE>                = '20260729'
+    R.SEC.TRADE<SC.SBS.CUST.SEC.ACC>              = 'ACC003'
+    R.SEC.TRADE<SC.SBS.CU.GROSS.AM.TRD>           = '300.30'
+    R.SEC.TRADE<SC.SBS.CU.NET.AM.TRD>             = '299.00'
+    R.SEC.TRADE<SC.SBS.DEPOSITORY>                = '200836-000'
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,SUB.ACC.POS>     = 'SUBACC2'
+    R.SEC.TRADE<SC.SBS.BR.ACC.NO>                 = 'BR002'
+    R.SEC.TRADE<SC.SBS.BR.GROSS.AM.TRD>           = '298.00'
+    R.SEC.TRADE<SC.SBS.BR.NET.AM.TRD>             = '295.00'
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,ST.BLK.POS>      = 'BLKY01'
+    R.SEC.TRADE<SC.SBS.LOCAL.REF,ST.BLK.Q.POS>    = '400'
+    R.SEC.TRADE<SC.SBS.OVERRIDE>                  = 'ST15 Override'      ;* no ~ { } * chars, survives CHANGE ops verbatim
+    R.SEC.TRADE<SC.SBS.INPUTTER,1>                = 'USER5'
+    R.SEC.TRADE<SC.SBS.AUTHORISER>                = 'USER6'
+    UTF.setRecord("F.SEC.TRADE$NAU", 'ST90002', R.SEC.TRADE)
+
+    R.SECURITY.MASTER = ''
+    R.SECURITY.MASTER<SC.SCM.SUB.ASSET.TYPE> = 'EQ'              ;* equals Y.SUB.ASSET -> OPTION SM branch
+    R.SECURITY.MASTER<SC.SCM.SHORT.NAME>     = 'SEC003 SHORT NAME'
+    UTF.setRecord("F.SECURITY.MASTER", 'SEC003', R.SECURITY.MASTER)
+
+    R.SECURITY.SUPP = ''
+    R.SECURITY.SUPP<SC.SSP.LOCAL.REF,UNDER.SM.POS> = 'UNDSEC03'
+    R.SECURITY.SUPP<SC.SSP.LOCAL.REF,STRIKE.POS>   = '200.00'
+    R.SECURITY.SUPP<SC.SSP.LOCAL.REF,NOTIONAL.POS> = '250000'
+    UTF.setRecord("F.SECURITY.SUPP", 'SEC003', R.SECURITY.SUPP)
+
+    R.SECURITY.MASTER.ULY = ''
+    R.SECURITY.MASTER.ULY<SC.SCM.SHORT.NAME> = 'UND SEC003 NAME'
+    UTF.setRecord("F.SECURITY.MASTER", 'UNDSEC03', R.SECURITY.MASTER.ULY)
+
+    R.CUSTOMER = ''
+    R.CUSTOMER<EB.CUS.LOCAL.REF,Y.PAPLESS.ADV.POS> = 'Y'
+    UTF.setRecord("F.CUSTOMER", '100101', R.CUSTOMER)
+
+* addParameter
+    UTF.addParam("Param1")
+    UTF.runTest("FIX.TRADE.ST15 enquiry builds return array via the ST15 override branch")
+* doAssertions for this testcase
+    UTF.assertEquals(UTF.getNbInvocation(trdStub3), "2")
+    UTF.assertEquals(UTF.getNbInvocation(txtStub), "1")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Compute the same SEL.CMD strings the routine builds>
+*** <desc> Mirrors the concatenation in SEC.TRD.SEL.LIST/SEC.TRFR.SEL.LIST exactly (same FN.*
+            constants and Y.CC1 derived from ID.COMPANY), so EB.READLIST stubs match on the
+            precise command text the routine will actually pass at run time</desc>
+
+computeExpectedSelCmds:
+    FN.SECURITY.TRANSFER.NAU = 'F.SECURITY.TRANSFER$NAU'
+    FN.SEC.TRADE.NAU         = 'F.SEC.TRADE$NAU'
+    Y.CC1 = ID.COMPANY[1,2]
+
+    Y.SEL.CMD.TRFR.NEW     = "SELECT ":FN.SECURITY.TRANSFER.NAU:" WITH RECORD.STATUS EQ 'INAU' AND CUST.REMARKS LIKE NEW... AND LED.TICKET.TYPE NE '' AND CO.CODE LIKE ":Y.CC1:'... BY SECURITY.NO'
+    Y.SEL.CMD.TRFR.FIX     = "SELECT ":FN.SECURITY.TRANSFER.NAU:" WITH RECORD.STATUS EQ 'INAU' AND CUST.REMARKS UNLIKE NEW... AND LED.TICKET.TYPE NE '' AND CO.CODE LIKE ":Y.CC1:'... BY SECURITY.NO'
+    Y.SEL.CMD.TRD.NEW      = "SELECT ":FN.SEC.TRADE.NAU:" WITH RECORD.STATUS EQ 'INAU' AND CU.NARRATIVE LIKE NEW... AND LED.TICKET.TYPE NE '' AND CO.CODE LIKE ":Y.CC1:'... BY SECURITY.CODE'
+    Y.SEL.CMD.TRD.FIX      = "SELECT ":FN.SEC.TRADE.NAU:" WITH RECORD.STATUS EQ 'INAU' AND CU.NARRATIVE UNLIKE NEW... AND LED.TICKET.TYPE NE '' AND CO.CODE LIKE ":Y.CC1:'... BY SECURITY.CODE'
+    Y.SEL.CMD.TRD.FIX.ST15 = "SELECT ":FN.SEC.TRADE.NAU:" WITH RECORD.STATUS EQ 'INAU' OR WITH RECORD.STATUS EQ 'INAO' AND CU.NARRATIVE UNLIKE NEW... AND LED.TICKET.TYPE NE '' AND CO.CODE LIKE ":Y.CC1:'... BY SECURITY.CODE'
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Stubs common for all test cases>
+*** <desc> Local ref positions below are placeholders - verify against the actual
+            LED.UNDER.SM/LED.STRIKE.PRIC/LED.NOTIONAL (on SECURITY.SUPP), LED.OPT.SM.ID/
+            LED.TICKET.TYPE/LWM.SUB.ACCOUNT/TRD.MOD.VERIF/LED.BLOCK.QTY/BLOCK.ID/UNBLOCK.ID/
+            LED.UNBLOCK.QTY (on SEC.TRADE), the same set (on SECURITY.TRANSFER), and
+            PAPERLESS.ADV (on CUSTOMER) positions configured in your environment</desc>
+
+setSharedStubs:
+    UNDER.SM.POS   = '10' ; STRIKE.POS = '11' ; NOTIONAL.POS = '12'
+    OPT.SM.POS = '20' ; TRD.TICKET.TYP.POS = '21' ; SUB.ACC.POS = '22' ; ST.TRD.POS = '23'
+    ST.BLK.Q.POS = '24' ; ST.BLK.POS = '25' ; ST.UBLK.POS = '26' ; ST.UBLK.Q.POS = '27'
+    TRFR.TICKET.TYP.POS = '30' ; STR.TRD.POS = '31' ; STR.BLK.Q.POS = '32' ; STR.BLK.POS = '33'
+    STR.UBLK.POS = '34' ; STR.UBLK.Q.POS = '35'
+    Y.PAPLESS.ADV.POS = '40'
+
+    Y.LOC.REF.APP.MATCH = 'SECURITY.SUPP':@FM:'SEC.TRADE':@FM:'SECURITY.TRANSFER':@FM:'CUSTOMER'
+    Y.LOC.REF.FLD.MATCH = 'LED.UNDER.SM':@VM:'LED.STRIKE.PRIC':@VM:'LED.NOTIONAL':@FM:'LED.OPT.SM.ID':@VM:'LED.TICKET.TYPE':@VM:'LWM.SUB.ACCOUNT':@VM:'TRD.MOD.VERIF':@VM:'LED.BLOCK.QTY':@VM:'BLOCK.ID':@VM:'UNBLOCK.ID':@VM:'LED.UNBLOCK.QTY':@FM:'LED.TICKET.TYPE':@VM:'TRD.MOD.VERIF':@VM:'LED.BLOCK.QTY':@VM:'BLOCK.ID':@VM:'UNBLOCK.ID':@VM:'LED.UNBLOCK.QTY':@FM:'PAPERLESS.ADV'
+
+    Y.ATTR1 = UNDER.SM.POS:@VM:STRIKE.POS:@VM:NOTIONAL.POS
+    Y.ATTR2 = OPT.SM.POS:@VM:TRD.TICKET.TYP.POS:@VM:SUB.ACC.POS:@VM:ST.TRD.POS:@VM:ST.BLK.Q.POS:@VM:ST.BLK.POS:@VM:ST.UBLK.POS:@VM:ST.UBLK.Q.POS
+    Y.ATTR3 = TRFR.TICKET.TYP.POS:@VM:STR.TRD.POS:@VM:STR.BLK.Q.POS:@VM:STR.BLK.POS:@VM:STR.UBLK.POS:@VM:STR.UBLK.Q.POS
+    Y.ATTR4 = Y.PAPLESS.ADV.POS
+    Y.LOC.REF.POS.OUT = Y.ATTR1:@FM:Y.ATTR2:@FM:Y.ATTR3:@FM:Y.ATTR4
+
+    STUB.LOC = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB.LOC, Y.LOC.REF.APP.MATCH, UTF.same())
+    UTF.addStubParam(STUB.LOC, Y.LOC.REF.FLD.MATCH, UTF.same())
+    UTF.addStubParam(STUB.LOC, UTF.any(), Y.LOC.REF.POS.OUT)
+
+    STUB.SAT = UTF.addStub("AEB.GET.VAL")
+    UTF.addStubParam(STUB.SAT, "SYSTEM", UTF.same())
+    UTF.addStubParam(STUB.SAT, "AQDQ.SAT", UTF.same())
+    UTF.addStubParam(STUB.SAT, UTF.any(), "EQ")
+    UTF.addStubParam(STUB.SAT, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.SAT, UTF.any(), UTF.same())
+    UTF.setRepeatable(STUB.SAT)
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Set details common for all test cases>
+*** <desc> </desc>
+
+setSharedDetails:
+
+    ID.COMPANY = 'GB0930264'
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+END
