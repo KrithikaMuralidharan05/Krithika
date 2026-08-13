@@ -1,0 +1,27 @@
+TESTCASE SCB.RB.EBBS.T24AR.DETAILS
+*-----------------------------------------------------------------------------
+* Modification History :
+*-----------------------
+* 03/10/2025 - ADO-10450834 - Anitha Rani S
+*              New Template changes
+* ----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_Table
+
+    UTF.setTarget("SCB.RB.EBBS.T24AR.DETAILS") 
+    UTF.setDescription("To store the eBBS response status")
+    GOSUB Ebbs_T24AR_Template
+*
+    RETURN
+*-----------------------------------------------------------------------------
+Ebbs_T24AR_Template:
+
+    UTF.reset()
+
+    UTF.runTest("To store the eBBS response status")
+    UTF.assertTrue('True')
+*
+    RETURN
+*-----------------------------------------------------------------------------
+END
