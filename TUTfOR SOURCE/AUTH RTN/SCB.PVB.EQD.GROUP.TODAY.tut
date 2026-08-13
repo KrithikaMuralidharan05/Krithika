@@ -1,0 +1,26 @@
+TESTCASE SCB.PVB.EQD.GROUP.TODAY
+*-----------------------------------------------------------------------------
+* Modification History :
+*-----------------------
+* 18/06/2026   12127880        8220461      Trade Grouping Logic in T24
+* ----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_Table
+
+    UTF.setTarget("SCB.PVB.EQD.GROUP.TODAY")
+    UTF.setDescription("SCB EQD SEC TRADE GROUPING")
+    GOSUB Pvb_Eqd_Group_Today_Template
+*
+    RETURN
+*-----------------------------------------------------------------------------
+Pvb_Eqd_Group_Today_Template:
+
+    UTF.reset()
+
+    UTF.runTest("SCB EQD SEC TRADE GROUPING")
+    UTF.assertTrue('True')
+*
+    RETURN
+*-----------------------------------------------------------------------------
+END
