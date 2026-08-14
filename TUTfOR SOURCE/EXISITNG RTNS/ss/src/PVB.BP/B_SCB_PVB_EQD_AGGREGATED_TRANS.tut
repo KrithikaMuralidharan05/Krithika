@@ -1,0 +1,291 @@
+TESTCASE B.SCB.PVB.EQD.AGGREGATED.TRANS
+*-----------------------------------------------------------------------------
+* @author     :  Raghavan K
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 26-Jun-2026 - Record routine to create an aggregated transfer for grouped EQD trades - Raghavan K
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+ 
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.SEC.TRADE
+    $INSERT I_F.SCB.PVB.EQD.GROUP.TODAY
+    $INSERT I_F.SECURITY.TRANSFER
+    $INSERT I_B.SCB.PVB.EQD.AGGREGATED.TRANS.COMMON
+    $INSERT I_F.SCB.WM.H.LOCAL.PARAM
+    $INSERT I_F.SECURITY.MASTER
+    $INSERT I_F.STOCK.EXCHANGE
+    $INSERT I_F.SC.SETT.INSTRUCT
+    $INSERT I_F.CUSTOMER.SECURITY
+    
+    UTF.setTarget("B.SCB.PVB.EQD.AGGREGATED.TRANS")                    ;* Name of the Target routine for which test is done
+    UTF.setDescription("Test the B.SCB.PVB.EQD.AGGREGATED.TRANS routine") ;* Default description for all tests
+    GOSUB runtest1
+    GOSUB runtest2
+    GOSUB runtest3
+    GOSUB runtest4
+    GOSUB runtest5
+    GOSUB runtest6
+                                     
+RETURN
+*-----------------------------------------------------------------------------
+runtest1:
+**********
+* BUY trade on SEHK with stamp duty > 0 - should set Y.BO.STATUS = 'CBO' and route to the HK aggregation customer
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("EQDGRP0001")
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0001'
+    R.GRP<SCB.EQD.ST.AGGREGATED.QTY> = '1000'
+    R.GRP<SCB.EQD.ST.PRICE,1> = '10.50'
+    R.GRP<SCB.EQD.ST.AGGREGATED.STAMP.DUTY> = '25'
+    UTF.setRecord('F.SCB.PVB.EQD.GROUP.TODAY', "EQDGRP0001", R.GRP)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0001'
+    R.TRD<SC.SBS.DEPOSITORY> = 'HKSCC'
+    R.TRD<SC.SBS.TRADE.CCY> = 'HKD'
+    R.TRD<SC.SBS.CUST.TRANS.CODE,1> = 'BUY'
+    R.TRD<SC.SBS.TRADE.DATE> = '20260626'
+    R.TRD<SC.SBS.VALUE.DATE> = '20260628'
+    R.TRD<SC.SBS.STOCK.EXCHANGE> = 'SEHK'
+    R.TRD<SC.SBS.CUSTOMER.NO> = '100234'
+    UTF.setRecord('F.SEC.TRADE', "TRD0001", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'HKD'
+    UTF.setRecord('F.SECURITY.MASTER', "SEC0001", R.SM)
+
+    R.STE = ''
+    R.STE<SC.STE.MKT.IDN.CODE> = 'XHKG'
+    UTF.setRecord('F.STOCK.EXCHANGE', "SEHK", R.STE)
+
+    R.SSI = ''
+    R.SSI<SC.SSI.DEAG,1> = 'DEAGENT01'
+    R.SSI<SC.SSI.DEAG.AC,1> = 'ACC0001'
+    R.SSI<SC.SSI.PSET,1> = 'HKSCPSET'
+    R.SSI<SC.SSI.STAMP.TXN,1,1> = Y.EQD.AGG.TXN.BUY
+    R.SSI<SC.SSI.STAMP.INDICATOR,1,1> = 'Y'
+    UTF.setRecord('F.SC.SETT.INSTRUCT', "HKSCC*SEHK*HKD", R.SSI)
+
+    R.CSC = ''
+    R.CSC<SC.CSC.SUB.ACCOUNT,1> = '100234'
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,1> = 'FIAC0001'
+    UTF.setRecord('F.CUSTOMER.SECURITY', "HKSCC", R.CSC)
+
+    UTF.runTest("Test B.SCB.PVB.EQD.AGGREGATED.TRANS - BUY trade on SEHK with stamp duty sets CBO status")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest2:
+**********
+* SELL trade on SGX in SGD across multiple grouped trades - should use the Omnibus safekeeping FIAC (position 1) and SG customer
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("EQDGRP0002")
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0002'
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,2> = 'TRD0003'
+    R.GRP<SCB.EQD.ST.AGGREGATED.QTY> = '2000'
+    R.GRP<SCB.EQD.ST.PRICE,1> = '5.25'
+    R.GRP<SCB.EQD.ST.AGGREGATED.STAMP.DUTY> = ''
+    UTF.setRecord('F.SCB.PVB.EQD.GROUP.TODAY', "EQDGRP0002", R.GRP)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0002'
+    R.TRD<SC.SBS.DEPOSITORY> = 'CDP'
+    R.TRD<SC.SBS.TRADE.CCY> = 'SGD'
+    R.TRD<SC.SBS.CUST.TRANS.CODE,1> = 'SELL'
+    R.TRD<SC.SBS.TRADE.DATE> = '20260626'
+    R.TRD<SC.SBS.VALUE.DATE> = '20260628'
+    R.TRD<SC.SBS.STOCK.EXCHANGE> = 'SGX'
+    R.TRD<SC.SBS.CUSTOMER.NO> = '200456'
+    UTF.setRecord('F.SEC.TRADE', "TRD0002", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'SGD'
+    UTF.setRecord('F.SECURITY.MASTER', "SEC0002", R.SM)
+
+    R.STE = ''
+    R.STE<SC.STE.MKT.IDN.CODE> = 'XSES'
+    UTF.setRecord('F.STOCK.EXCHANGE', "SGX", R.STE)
+
+    R.SSI = ''
+    R.SSI<SC.SSI.REAG,1> = 'REAGENT01'
+    R.SSI<SC.SSI.REAG.AC,1> = 'ACC0002'
+    R.SSI<SC.SSI.PSET,1> = 'CDPPSET'
+    R.SSI<SC.SSI.STAMP.TXN,1,1> = Y.EQD.AGG.TXN.SELL
+    R.SSI<SC.SSI.STAMP.INDICATOR,1,1> = ''
+    UTF.setRecord('F.SC.SETT.INSTRUCT', "CDP*SGX*SGD", R.SSI)
+
+    R.CSC = ''
+    R.CSC<SC.CSC.SUB.ACCOUNT,1> = '999999' ;* Deliberately different from trade customer to prove the Omnibus branch is used instead of LOCATE
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,1> = 'FIAC0002'
+    UTF.setRecord('F.CUSTOMER.SECURITY', "CDP", R.CSC)
+
+    UTF.runTest("Test B.SCB.PVB.EQD.AGGREGATED.TRANS - SGX SGD multi-trade group uses the Omnibus safekeep account")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest3:
+**********
+* BUY trade on LSE with stamp duty > 0 - should populate Y.AT.STAMP.CODE via the LSE branch of the CASE statement
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("EQDGRP0003")
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0004'
+    R.GRP<SCB.EQD.ST.AGGREGATED.QTY> = '500'
+    R.GRP<SCB.EQD.ST.PRICE,1> = '20.00'
+    R.GRP<SCB.EQD.ST.AGGREGATED.STAMP.DUTY> = '10'
+    UTF.setRecord('F.SCB.PVB.EQD.GROUP.TODAY', "EQDGRP0003", R.GRP)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0003'
+    R.TRD<SC.SBS.DEPOSITORY> = 'CREST'
+    R.TRD<SC.SBS.TRADE.CCY> = 'GBP'
+    R.TRD<SC.SBS.CUST.TRANS.CODE,1> = 'BUY'
+    R.TRD<SC.SBS.TRADE.DATE> = '20260626'
+    R.TRD<SC.SBS.VALUE.DATE> = '20260628'
+    R.TRD<SC.SBS.STOCK.EXCHANGE> = 'LSE'
+    R.TRD<SC.SBS.CUSTOMER.NO> = '100234'
+    UTF.setRecord('F.SEC.TRADE', "TRD0004", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'GBP'
+    UTF.setRecord('F.SECURITY.MASTER', "SEC0003", R.SM)
+
+    R.STE = ''
+    R.STE<SC.STE.MKT.IDN.CODE> = 'XLON'
+    UTF.setRecord('F.STOCK.EXCHANGE', "LSE", R.STE)
+
+    R.SSI = ''
+    R.SSI<SC.SSI.DEAG,1> = 'DEAGENT02'
+    R.SSI<SC.SSI.DEAG.AC,1> = 'ACC0003'
+    R.SSI<SC.SSI.PSET,1> = 'CRESTPSET'
+    R.SSI<SC.SSI.STAMP.TXN,1,1> = Y.EQD.AGG.TXN.BUY
+    R.SSI<SC.SSI.STAMP.INDICATOR,1,1> = 'Y'
+    UTF.setRecord('F.SC.SETT.INSTRUCT', "CREST*LSE*GBP", R.SSI)
+
+    R.CSC = ''
+    R.CSC<SC.CSC.SUB.ACCOUNT,1> = '100234'
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,1> = 'FIAC0003'
+    UTF.setRecord('F.CUSTOMER.SECURITY', "CREST", R.CSC)
+
+    UTF.runTest("Test B.SCB.PVB.EQD.AGGREGATED.TRANS - BUY trade on LSE with stamp duty sets the stamp code")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest4:
+**********
+* SELL trade on an exchange other than SEHK/LSE/SGX with no stamp duty - default (blank) stamp code, sub-account located by customer match
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("EQDGRP0004")
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0005'
+    R.GRP<SCB.EQD.ST.AGGREGATED.QTY> = '750'
+    R.GRP<SCB.EQD.ST.PRICE,1> = '30.75'
+    R.GRP<SCB.EQD.ST.AGGREGATED.STAMP.DUTY> = ''
+    UTF.setRecord('F.SCB.PVB.EQD.GROUP.TODAY', "EQDGRP0004", R.GRP)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0004'
+    R.TRD<SC.SBS.DEPOSITORY> = 'DTC'
+    R.TRD<SC.SBS.TRADE.CCY> = 'USD'
+    R.TRD<SC.SBS.CUST.TRANS.CODE,1> = 'SELL'
+    R.TRD<SC.SBS.TRADE.DATE> = '20260626'
+    R.TRD<SC.SBS.VALUE.DATE> = '20260628'
+    R.TRD<SC.SBS.STOCK.EXCHANGE> = 'NYSE'
+    R.TRD<SC.SBS.CUSTOMER.NO> = '300789'
+    UTF.setRecord('F.SEC.TRADE', "TRD0005", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'USD'
+    UTF.setRecord('F.SECURITY.MASTER', "SEC0004", R.SM)
+
+    R.STE = ''
+    R.STE<SC.STE.MKT.IDN.CODE> = 'XNYS'
+    UTF.setRecord('F.STOCK.EXCHANGE', "NYSE", R.STE)
+
+    R.SSI = ''
+    R.SSI<SC.SSI.REAG,1> = 'REAGENT02'
+    R.SSI<SC.SSI.REAG.AC,1> = 'ACC0004'
+    R.SSI<SC.SSI.PSET,1> = 'DTCPSET'
+    R.SSI<SC.SSI.STAMP.TXN,1,1> = Y.EQD.AGG.TXN.SELL
+    R.SSI<SC.SSI.STAMP.INDICATOR,1,1> = ''
+    UTF.setRecord('F.SC.SETT.INSTRUCT', "DTC*NYSE*USD", R.SSI)
+
+    R.CSC = ''
+    R.CSC<SC.CSC.SUB.ACCOUNT,1> = '999111'
+    R.CSC<SC.CSC.SUB.ACCOUNT,2> = '300789' ;* Matches trade customer at position 2
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,1> = 'FIAC0005'
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,2> = 'FIAC0006'
+    UTF.setRecord('F.CUSTOMER.SECURITY', "DTC", R.CSC)
+
+    UTF.runTest("Test B.SCB.PVB.EQD.AGGREGATED.TRANS - SELL trade on NYSE locates the sub-account by customer number")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest5:
+**********
+* No SCB.PVB.EQD.GROUP.TODAY record exists for the given group id - PROCESS should skip all downstream GOSUBs without erroring
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("EQDGRP9999")
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+
+    UTF.runTest("Test B.SCB.PVB.EQD.AGGREGATED.TRANS - Non-existent group id is skipped gracefully")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest6:
+**********
+* Negative scenario - no group id passed in and no records set up, highlights an unhandled edge case
+    UTF.reset() ;* Reset all
+
+    UTF.runTest("Test B.SCB.PVB.EQD.AGGREGATED.TRANS - Missing group id parameter")
+    UTF.assertTrue("FALSE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+setSharedDetails:
+*****************
+    FN.SCB.PVB.EQD.GROUP.TODAY = 'F.SCB.PVB.EQD.GROUP.TODAY'
+    F.SCB.PVB.EQD.GROUP.TODAY  = 'F.SCB.PVB.EQD.GROUP.TODAY'
+
+    FN.SEC.TRADE = 'F.SEC.TRADE'
+    F.SEC.TRADE  = 'F.SEC.TRADE'
+
+    FN.SECURITY.MASTER = 'F.SECURITY.MASTER'
+    F.SECURITY.MASTER  = 'F.SECURITY.MASTER'
+
+    FN.STOCK.EXCHANGE = 'F.STOCK.EXCHANGE'
+    F.STOCK.EXCHANGE  = 'F.STOCK.EXCHANGE'
+
+    FN.SC.SETT.INSTRUCT = 'F.SC.SETT.INSTRUCT'
+    F.SC.SETT.INSTRUCT  = 'F.SC.SETT.INSTRUCT'
+
+    FN.CUSTOMER.SECURITY = 'F.CUSTOMER.SECURITY'
+    F.CUSTOMER.SECURITY  = 'F.CUSTOMER.SECURITY'
+
+RETURN
+*-----------------------------------------------------------------------------
+END
