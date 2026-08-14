@@ -1,0 +1,133 @@
+TESTCASE B.SCB.TRADE.EQD.BUY.FUNDING.SELECT
+*-----------------------------------------------------------------------------
+* @author     :  Raghavan K
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 28-Jul-2026 - EQD - Funding Grouping Logic enhancement to have Authorization Date as Calendar Date - ADO-14393564 - Raghavan K
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+ 
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_BATCH.FILES
+    $INSERT I_F.SEC.TRADE
+    $INSERT I_F.SCB.TRADE.UPD.EQD.BUY.FUND
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_B.SCB.TRADE.EQD.BUY.FUNDING.COMMON
+    $INSERT I_F.DATES
+    $INSERT I_F.BENEFICIARY
+    $INSERT I_F.COMPANY
+    
+    UTF.setTarget("B.SCB.TRADE.EQD.BUY.FUNDING.SELECT")                    ;* Name of the Target routine for which test is done
+    UTF.setDescription("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine") ;* Default description for all tests
+    GOSUB runtest1
+    GOSUB runtest2
+    GOSUB runtest3
+    GOSUB runtest4
+    GOSUB runtest5
+                                     
+RETURN
+*-----------------------------------------------------------------------------
+runtest1:
+**********
+* Singapore SGD book (ID.COMPANY = SG1090400) - only SGD funding records should be picked up in SEL.LIST
+    UTF.reset() ;* Reset all
+
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+
+    ID.COMPANY = 'SG1090400'
+    UTF.setRecord('F.DATES', ID.COMPANY, R.DATES)
+
+    R.EQD = ''
+    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.SGD.':Y.CAL.DATE:'.0001', R.EQD)
+    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.USD.':Y.CAL.DATE:'.0001', R.EQD)
+
+    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - SGD company should only select SGD records")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest2:
+**********
+* Singapore non-SGD/ACU book (ID.COMPANY is SG.. but not SG1090400) - only non-SGD (ACU) funding records should be picked up
+    UTF.reset() ;* Reset all
+
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+
+    ID.COMPANY = 'SG0010001'
+    UTF.setRecord('F.DATES', ID.COMPANY, R.DATES)
+
+    R.EQD = ''
+    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.SGD.':Y.CAL.DATE:'.0001', R.EQD)
+    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.USD.':Y.CAL.DATE:'.0001', R.EQD)
+
+    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - Non-SG1090400 SG company should only select ACU (non-SGD) records")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest3:
+**********
+* Non-Singapore company (ID.COMPANY does not start with SG) - no currency filtering should be applied, full SEL.LIST retained
+    UTF.reset() ;* Reset all
+
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+
+    ID.COMPANY = 'GB0010001'
+    UTF.setRecord('F.DATES', ID.COMPANY, R.DATES)
+
+    R.EQD = ''
+    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.SGD.':Y.CAL.DATE:'.0001', R.EQD)
+    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.USD.':Y.CAL.DATE:'.0001', R.EQD)
+
+    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - Non-SG company should skip the currency filter and select all records")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest4:
+**********
+* No funding records exist for today's calendar date - SEL.LIST is empty, BATCH.BUILD.LIST should still be called without error
+    UTF.reset() ;* Reset all
+
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+
+    ID.COMPANY = 'SG1090400'
+    UTF.setRecord('F.DATES', ID.COMPANY, R.DATES)
+
+    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - No records found for the calendar date")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest5:
+**********
+* Negative scenario - no shared setup / no R.DATES record available for the company, highlights an unhandled edge case
+    UTF.reset() ;* Reset all
+
+    ID.COMPANY = 'SG1090400'
+
+    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - Missing R.DATES setup")
+    UTF.assertTrue("FALSE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+setSharedDetails:
+*****************
+    FN.SCB.TRADE.UPD.EQD.BUY.FUND = 'F.SCB.TRADE.UPD.EQD.BUY.FUND'
+    F.SCB.TRADE.UPD.EQD.BUY.FUND  = 'F.SCB.TRADE.UPD.EQD.BUY.FUND'
+
+    FN.DATES = 'F.DATES'
+    F.DATES  = 'F.DATES'
+
+    Y.DATE.TODAY = OCONV(DATE(),"D4/")
+    Y.CAL.DATE   = Y.DATE.TODAY[7,4]:Y.DATE.TODAY[1,2]:Y.DATE.TODAY[4,2]
+
+    R.DATES = ''
+    R.DATES<EB.DAT.LAST.WORKING.DAY> = Y.CAL.DATE
+
+RETURN
+*-----------------------------------------------------------------------------
+END
