@@ -1,133 +1,445 @@
-TESTCASE B.SCB.TRADE.EQD.BUY.FUNDING.SELECT
+TESTCASE B.SCB.PVB.EQD.AGGREGATED.TRANS
 *-----------------------------------------------------------------------------
 * @author     :  Raghavan K
 *-----------------------------------------------------------------------------
-* Modification History :
 *
-* 28-Jul-2026 - EQD - Funding Grouping Logic enhancement to have Authorization Date as Calendar Date - ADO-14393564 - Raghavan K
+*   Modification History :
+*
+*   26-Jun-2026 - Record routine to create an aggregated transfer for grouped EQD trades - Raghavan K
+*
 *-----------------------------------------------------------------------------
 *** <region = Header>
 *** <desc> </desc>
- 
     $INSERT I_COMMON
     $INSERT I_EQUATE
-    $INSERT I_BATCH.FILES
     $INSERT I_F.SEC.TRADE
-    $INSERT I_F.SCB.TRADE.UPD.EQD.BUY.FUND
-    $INSERT I_F.FUNDS.TRANSFER
-    $INSERT I_B.SCB.TRADE.EQD.BUY.FUNDING.COMMON
-    $INSERT I_F.DATES
-    $INSERT I_F.BENEFICIARY
-    $INSERT I_F.COMPANY
-    
-    UTF.setTarget("B.SCB.TRADE.EQD.BUY.FUNDING.SELECT")                    ;* Name of the Target routine for which test is done
-    UTF.setDescription("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine") ;* Default description for all tests
-    GOSUB runtest1
-    GOSUB runtest2
-    GOSUB runtest3
-    GOSUB runtest4
-    GOSUB runtest5
-                                     
-RETURN
+    $INSERT I_F.SCB.PVB.EQD.GROUP.TODAY
+    $INSERT I_F.SECURITY.TRANSFER
+    $INSERT I_B.SCB.PVB.EQD.AGGREGATED.TRANS.COMMON
+    $INSERT I_F.SCB.WM.H.LOCAL.PARAM
+    $INSERT I_F.SECURITY.MASTER
+    $INSERT I_F.STOCK.EXCHANGE
+    $INSERT I_F.SC.SETT.INSTRUCT
+    $INSERT I_F.CUSTOMER.SECURITY
+
+    UTF.setTarget("B.SCB.PVB.EQD.AGGREGATED.TRANS")   ;* Name of the Target routine for which test is done
+    UTF.setDescription("Record routine - builds the aggregated SECURITY.TRANSFER for a grouped EQD trade")
+    GOSUB runtest1                                     ;* BUY on SEHK, stamp duty>0, OFS succeeds -> LIVE
+    GOSUB runtest2                                     ;* SELL on SGX/SGD, multi-trade Omnibus branch, OFS fails -> ERROR
+    GOSUB runtest3                                     ;* BUY on LSE, stamp duty>0 -> LSE stamp-code branch, OFS succeeds -> LIVE
+    GOSUB runtest4                                     ;* SELL on an unmapped exchange, sub-account located by customer no -> LIVE
+    GOSUB runtest5                                     ;* Group id has no SCB.PVB.EQD.GROUP.TODAY record -> PROCESS is skipped entirely
+    GOSUB runtest6                                     ;* Negative scenario - group id with no supporting data at all
+*
+    RETURN
+*** </region>
 *-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> BUY trade on SEHK with stamp duty > 0 -> Y.BO.STATUS = 'CBO', OFS build/send both
+            succeed for the main transfer and its contra -> group is marked LIVE with the
+            transfer id returned by OFS.CALL.BULK.MANAGER</desc>
+
 runtest1:
-**********
-* Singapore SGD book (ID.COMPANY = SG1090400) - only SGD funding records should be picked up in SEL.LIST
+
     UTF.reset() ;* Reset all
+    GOSUB setSharedDetails      ;* Commons/positions + business constants required for all test cases
+    GOSUB setSharedStubs        ;* OFS.BUILD.RECORD stub required for all test cases
+* set data for this test
+    UTF.addParam("EQDGRP0001")
 
-    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0001'
+    R.GRP<SCB.EQD.ST.AGGREGATED.QTY> = '1000'
+    R.GRP<SCB.EQD.ST.PRICE,1> = '10.50'
+    R.GRP<SCB.EQD.ST.AGGREGATED.STAMP.DUTY> = '25'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", "EQDGRP0001", R.GRP)
 
-    ID.COMPANY = 'SG1090400'
-    UTF.setRecord('F.DATES', ID.COMPANY, R.DATES)
+    R.TRD = ''
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0001'
+    R.TRD<SC.SBS.DEPOSITORY> = 'HKSCC'
+    R.TRD<SC.SBS.TRADE.CCY> = 'HKD'
+    R.TRD<SC.SBS.CUST.TRANS.CODE,1> = 'BUY'
+    R.TRD<SC.SBS.TRADE.DATE> = '20260626'
+    R.TRD<SC.SBS.VALUE.DATE> = '20260628'
+    R.TRD<SC.SBS.STOCK.EXCHANGE> = 'SEHK'
+    R.TRD<SC.SBS.CUSTOMER.NO> = '100234'
+    UTF.setRecord("F.SEC.TRADE", "TRD0001", R.TRD)
 
-    R.EQD = ''
-    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.SGD.':Y.CAL.DATE:'.0001', R.EQD)
-    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.USD.':Y.CAL.DATE:'.0001', R.EQD)
+    R.SM = ''
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'HKD'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0001", R.SM)
 
-    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - SGD company should only select SGD records")
-    UTF.assertTrue("TRUE")
-    
+    R.STE = ''
+    R.STE<SC.STE.MKT.IDN.CODE> = 'XHKG'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+    R.SSI = ''
+    R.SSI<SC.SSI.DEAG,1> = 'DEAGENT01'
+    R.SSI<SC.SSI.DEAG.AC,1> = 'ACC0001'
+    R.SSI<SC.SSI.SELL,1> = 'SELLAGENT01'
+    R.SSI<SC.SSI.PSET,1> = 'HKSCPSET'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.95P.DEAG,1> = '95PDEAG001'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.95Q.DEAG,1> = '95QDEAG001'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.SELL.95P,1> = '95PSELL001'
+    R.SSI<SC.SSI.STAMP.TXN,1,1> = Y.EQD.AGG.TXN.BUY
+    R.SSI<SC.SSI.STAMP.INDICATOR,1,1> = 'Y'
+    UTF.setRecord("F.SC.SETT.INSTRUCT", "HKSCC*SEHK*HKD", R.SSI)
+
+    R.CSC = ''
+    R.CSC<SC.CSC.SUB.ACCOUNT,1> = '100234'
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,1> = 'FIAC0001'
+    UTF.setRecord("F.CUSTOMER.SECURITY", "HKSCC", R.CSC)
+* set stubs for this test - OFS build/send succeeds for both the main transfer and its contra
+    STUB.BULK1 = UTF.addStub("OFS.CALL.BULK.MANAGER")
+    UTF.addStubParam(STUB.BULK1, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.BULK1, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.BULK1, UTF.any(), "SECTSC2601293104/SECURITY.TRANSFER/1,,")
+    UTF.addStubParam(STUB.BULK1, UTF.any(), UTF.same())
+    UTF.setRepeatable(STUB.BULK1)
+* addParameter
+    UTF.runTest("BUY trade on SEHK with stamp duty - group is marked LIVE")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", "EQDGRP0001")
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.STATUS>, "LIVE")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>, "SECTSC2601293104")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.ERROR>, "")
+
 RETURN
+*** </region>
 *-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> SELL trade on SGX in SGD across a multi-trade group -> Omnibus safekeeping branch
+            (SUB.ACC.EXT.ID position 1 used instead of LOCATE); OFS.CALL.BULK.MANAGER returns a
+            failure status for the main transfer -> group is marked ERROR, contra is skipped</desc>
+
 runtest2:
-**********
-* Singapore non-SGD/ACU book (ID.COMPANY is SG.. but not SG1090400) - only non-SGD (ACU) funding records should be picked up
+
     UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    UTF.addParam("EQDGRP0002")
 
-    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0002'
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,2> = 'TRD0003'
+    R.GRP<SCB.EQD.ST.AGGREGATED.QTY> = '2000'
+    R.GRP<SCB.EQD.ST.PRICE,1> = '5.25'
+    R.GRP<SCB.EQD.ST.AGGREGATED.STAMP.DUTY> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", "EQDGRP0002", R.GRP)
 
-    ID.COMPANY = 'SG0010001'
-    UTF.setRecord('F.DATES', ID.COMPANY, R.DATES)
+    R.TRD = ''
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0002'
+    R.TRD<SC.SBS.DEPOSITORY> = 'CDP'
+    R.TRD<SC.SBS.TRADE.CCY> = 'SGD'
+    R.TRD<SC.SBS.CUST.TRANS.CODE,1> = 'SELL'
+    R.TRD<SC.SBS.TRADE.DATE> = '20260626'
+    R.TRD<SC.SBS.VALUE.DATE> = '20260628'
+    R.TRD<SC.SBS.STOCK.EXCHANGE> = 'SGX'
+    R.TRD<SC.SBS.CUSTOMER.NO> = '200456'
+    UTF.setRecord("F.SEC.TRADE", "TRD0002", R.TRD)
 
-    R.EQD = ''
-    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.SGD.':Y.CAL.DATE:'.0001', R.EQD)
-    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.USD.':Y.CAL.DATE:'.0001', R.EQD)
+    R.SM = ''
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'SGD'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0002", R.SM)
 
-    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - Non-SG1090400 SG company should only select ACU (non-SGD) records")
-    UTF.assertTrue("TRUE")
-    
+    R.STE = ''
+    R.STE<SC.STE.MKT.IDN.CODE> = 'XSES'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SGX", R.STE)
+
+    R.SSI = ''
+    R.SSI<SC.SSI.REAG,1> = 'REAGENT01'
+    R.SSI<SC.SSI.REAG.AC,1> = 'ACC0002'
+    R.SSI<SC.SSI.BUYR,1> = 'BUYRAGENT01'
+    R.SSI<SC.SSI.PSET,1> = 'CDPPSET'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.95P.REAG,1> = '95PREAG002'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.95Q.REAG,1> = '95QREAG002'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.BUYR.95P,1> = '95PBUYR002'
+    R.SSI<SC.SSI.STAMP.TXN,1,1> = Y.EQD.AGG.TXN.SELL
+    R.SSI<SC.SSI.STAMP.INDICATOR,1,1> = ''
+    UTF.setRecord("F.SC.SETT.INSTRUCT", "CDP*SGX*SGD", R.SSI)
+
+    R.CSC = ''
+    R.CSC<SC.CSC.SUB.ACCOUNT,1> = '999999' ;* deliberately different from the trade customer no, to prove the Omnibus branch (not LOCATE) is used
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,1> = 'FIAC0002'
+    UTF.setRecord("F.CUSTOMER.SECURITY", "CDP", R.CSC)
+* set stubs for this test - main OFS send fails, so the contra branch is never reached
+    STUB.BULK2 = UTF.addStub("OFS.CALL.BULK.MANAGER")
+    UTF.addStubParam(STUB.BULK2, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.BULK2, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.BULK2, UTF.any(), "/SECURITY.TRANSFER/-1,Insufficient balance,,")
+    UTF.addStubParam(STUB.BULK2, UTF.any(), UTF.same())
+    UTF.setRepeatable(STUB.BULK2)
+* addParameter
+    UTF.runTest("SGX SGD multi-trade group uses the Omnibus safekeep account; OFS failure marks group ERROR")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", "EQDGRP0002")
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.STATUS>, "ERROR")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>, "")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.ERROR>, "Insufficient balance")
+
 RETURN
+*** </region>
 *-----------------------------------------------------------------------------
+*** <region name= testcase3>
+*** <desc> BUY trade on LSE with stamp duty > 0 -> exercises the second CASE branch that sets
+            Y.AT.STAMP.CODE; OFS build/send succeed -> group is marked LIVE</desc>
+
 runtest3:
-**********
-* Non-Singapore company (ID.COMPANY does not start with SG) - no currency filtering should be applied, full SEL.LIST retained
+
     UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    UTF.addParam("EQDGRP0003")
 
-    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0004'
+    R.GRP<SCB.EQD.ST.AGGREGATED.QTY> = '500'
+    R.GRP<SCB.EQD.ST.PRICE,1> = '20.00'
+    R.GRP<SCB.EQD.ST.AGGREGATED.STAMP.DUTY> = '10'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", "EQDGRP0003", R.GRP)
 
-    ID.COMPANY = 'GB0010001'
-    UTF.setRecord('F.DATES', ID.COMPANY, R.DATES)
+    R.TRD = ''
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0003'
+    R.TRD<SC.SBS.DEPOSITORY> = 'CREST'
+    R.TRD<SC.SBS.TRADE.CCY> = 'GBP'
+    R.TRD<SC.SBS.CUST.TRANS.CODE,1> = 'BUY'
+    R.TRD<SC.SBS.TRADE.DATE> = '20260626'
+    R.TRD<SC.SBS.VALUE.DATE> = '20260628'
+    R.TRD<SC.SBS.STOCK.EXCHANGE> = 'LSE'
+    R.TRD<SC.SBS.CUSTOMER.NO> = '100234'
+    UTF.setRecord("F.SEC.TRADE", "TRD0004", R.TRD)
 
-    R.EQD = ''
-    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.SGD.':Y.CAL.DATE:'.0001', R.EQD)
-    UTF.setRecord('F.SCB.TRADE.UPD.EQD.BUY.FUND', 'EQD.USD.':Y.CAL.DATE:'.0001', R.EQD)
+    R.SM = ''
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'GBP'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0003", R.SM)
 
-    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - Non-SG company should skip the currency filter and select all records")
-    UTF.assertTrue("TRUE")
-    
+    R.STE = ''
+    R.STE<SC.STE.MKT.IDN.CODE> = 'XLON'
+    UTF.setRecord("F.STOCK.EXCHANGE", "LSE", R.STE)
+
+    R.SSI = ''
+    R.SSI<SC.SSI.DEAG,1> = 'DEAGENT02'
+    R.SSI<SC.SSI.DEAG.AC,1> = 'ACC0003'
+    R.SSI<SC.SSI.SELL,1> = 'SELLAGENT02'
+    R.SSI<SC.SSI.PSET,1> = 'CRESTPSET'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.95P.DEAG,1> = '95PDEAG003'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.95Q.DEAG,1> = '95QDEAG003'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.SELL.95P,1> = '95PSELL003'
+    R.SSI<SC.SSI.STAMP.TXN,1,1> = Y.EQD.AGG.TXN.BUY
+    R.SSI<SC.SSI.STAMP.INDICATOR,1,1> = 'Y'
+    UTF.setRecord("F.SC.SETT.INSTRUCT", "CREST*LSE*GBP", R.SSI)
+
+    R.CSC = ''
+    R.CSC<SC.CSC.SUB.ACCOUNT,1> = '100234'
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,1> = 'FIAC0003'
+    UTF.setRecord("F.CUSTOMER.SECURITY", "CREST", R.CSC)
+* set stubs for this test
+    STUB.BULK3 = UTF.addStub("OFS.CALL.BULK.MANAGER")
+    UTF.addStubParam(STUB.BULK3, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.BULK3, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.BULK3, UTF.any(), "SECTSC2601293105/SECURITY.TRANSFER/1,,")
+    UTF.addStubParam(STUB.BULK3, UTF.any(), UTF.same())
+    UTF.setRepeatable(STUB.BULK3)
+* addParameter
+    UTF.runTest("BUY trade on LSE with stamp duty - group is marked LIVE")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", "EQDGRP0003")
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.STATUS>, "LIVE")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>, "SECTSC2601293105")
+
 RETURN
+*** </region>
 *-----------------------------------------------------------------------------
+*** <region name= testcase4>
+*** <desc> SELL trade on an exchange other than SEHK/LSE/SGX with no stamp duty -> default
+            (blank) stamp code branch; sub-account is located via LOCATE on the trade customer
+            number (position 2) rather than the Omnibus branch</desc>
+
 runtest4:
-**********
-* No funding records exist for today's calendar date - SEL.LIST is empty, BATCH.BUILD.LIST should still be called without error
+
     UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    UTF.addParam("EQDGRP0004")
 
-    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0005'
+    R.GRP<SCB.EQD.ST.AGGREGATED.QTY> = '750'
+    R.GRP<SCB.EQD.ST.PRICE,1> = '30.75'
+    R.GRP<SCB.EQD.ST.AGGREGATED.STAMP.DUTY> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", "EQDGRP0004", R.GRP)
 
-    ID.COMPANY = 'SG1090400'
-    UTF.setRecord('F.DATES', ID.COMPANY, R.DATES)
+    R.TRD = ''
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0004'
+    R.TRD<SC.SBS.DEPOSITORY> = 'DTC'
+    R.TRD<SC.SBS.TRADE.CCY> = 'USD'
+    R.TRD<SC.SBS.CUST.TRANS.CODE,1> = 'SELL'
+    R.TRD<SC.SBS.TRADE.DATE> = '20260626'
+    R.TRD<SC.SBS.VALUE.DATE> = '20260628'
+    R.TRD<SC.SBS.STOCK.EXCHANGE> = 'NYSE'
+    R.TRD<SC.SBS.CUSTOMER.NO> = '300789'
+    UTF.setRecord("F.SEC.TRADE", "TRD0005", R.TRD)
 
-    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - No records found for the calendar date")
-    UTF.assertTrue("TRUE")
-    
+    R.SM = ''
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'USD'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0004", R.SM)
+
+    R.STE = ''
+    R.STE<SC.STE.MKT.IDN.CODE> = 'XNYS'
+    UTF.setRecord("F.STOCK.EXCHANGE", "NYSE", R.STE)
+
+    R.SSI = ''
+    R.SSI<SC.SSI.REAG,1> = 'REAGENT02'
+    R.SSI<SC.SSI.REAG.AC,1> = 'ACC0004'
+    R.SSI<SC.SSI.BUYR,1> = 'BUYRAGENT02'
+    R.SSI<SC.SSI.PSET,1> = 'DTCPSET'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.95P.REAG,1> = '95PREAG004'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.95Q.REAG,1> = '95QREAG004'
+    R.SSI<SC.SSI.LOCAL.REF,POS.SSI.BUYR.95P,1> = '95PBUYR004'
+    R.SSI<SC.SSI.STAMP.TXN,1,1> = Y.EQD.AGG.TXN.SELL
+    R.SSI<SC.SSI.STAMP.INDICATOR,1,1> = ''
+    UTF.setRecord("F.SC.SETT.INSTRUCT", "DTC*NYSE*USD", R.SSI)
+
+    R.CSC = ''
+    R.CSC<SC.CSC.SUB.ACCOUNT,1> = '999111'
+    R.CSC<SC.CSC.SUB.ACCOUNT,2> = '300789'          ;* matches the trade customer no at position 2
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,1> = 'FIAC0005'
+    R.CSC<SC.CSC.SUB.ACC.EXT.ID,2> = 'FIAC0006'
+    UTF.setRecord("F.CUSTOMER.SECURITY", "DTC", R.CSC)
+* set stubs for this test
+    STUB.BULK4 = UTF.addStub("OFS.CALL.BULK.MANAGER")
+    UTF.addStubParam(STUB.BULK4, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.BULK4, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.BULK4, UTF.any(), "SECTSC2601293106/SECURITY.TRANSFER/1,,")
+    UTF.addStubParam(STUB.BULK4, UTF.any(), UTF.same())
+    UTF.setRepeatable(STUB.BULK4)
+* addParameter
+    UTF.runTest("SELL trade on NYSE locates the sub-account by customer number and goes LIVE")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", "EQDGRP0004")
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.STATUS>, "LIVE")
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>, "SECTSC2601293106")
+
 RETURN
+*** </region>
 *-----------------------------------------------------------------------------
+*** <region name= testcase5>
+*** <desc> No SCB.PVB.EQD.GROUP.TODAY record exists for the given group id -> PROCESS should
+            skip GET.GRP.CUST.DET/GET.SSI.DET/FORM.AGG.TRANS.OFS entirely and simply return</desc>
+
 runtest5:
-**********
-* Negative scenario - no shared setup / no R.DATES record available for the company, highlights an unhandled edge case
+
     UTF.reset() ;* Reset all
+    GOSUB setSharedDetails
+    GOSUB setSharedStubs
+* set data for this test
+    UTF.addParam("EQDGRP9999")     ;* deliberately no F.SCB.PVB.EQD.GROUP.TODAY record set up for this id
+* set stubs for this test
+* addParameter
+    UTF.runTest("Non-existent group id is skipped gracefully - no OFS calls attempted")
+    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", "EQDGRP9999")
+* doAssertions for this testcase
+    UTF.assertEquals(TRD.REC<SCB.EQD.ST.AGGREGATED.STATUS>, "")
 
-    ID.COMPANY = 'SG1090400'
-
-    UTF.runTest("Test the B.SCB.TRADE.EQD.BUY.FUNDING.SELECT routine - Missing R.DATES setup")
-    UTF.assertTrue("FALSE")
-    
 RETURN
+*** </region>
 *-----------------------------------------------------------------------------
-setSharedDetails:
-*****************
-    FN.SCB.TRADE.UPD.EQD.BUY.FUND = 'F.SCB.TRADE.UPD.EQD.BUY.FUND'
-    F.SCB.TRADE.UPD.EQD.BUY.FUND  = 'F.SCB.TRADE.UPD.EQD.BUY.FUND'
+*** <region name= testcase6>
+*** <desc> Negative scenario - group id passed in has no backing SEC.TRADE/SSI/etc data,
+            highlights an unhandled edge case</desc>
 
-    FN.DATES = 'F.DATES'
-    F.DATES  = 'F.DATES'
+runtest6:
 
-    Y.DATE.TODAY = OCONV(DATE(),"D4/")
-    Y.CAL.DATE   = Y.DATE.TODAY[7,4]:Y.DATE.TODAY[1,2]:Y.DATE.TODAY[4,2]
-
-    R.DATES = ''
-    R.DATES<EB.DAT.LAST.WORKING.DAY> = Y.CAL.DATE
+    UTF.reset() ;* Reset all
+    UTF.addParam("EQDGRP0000")     ;* Routine takes exactly 1 argument (Y.GRP.ID) - must always be supplied
+* addParameter
+    UTF.runTest("Group id with no supporting data at all")
+    UTF.assertTrue("FALSE")
 
 RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Stubs common for all test cases>
+*** <desc> OFS.BUILD.RECORD is called once for the main transfer and once for the contra -
+            stub it to always hand back a non-blank OFS.RECORD so downstream processing (the
+            IF OFS.RECORD THEN branch) is reached. OFS.CALL.BULK.MANAGER is stubbed per test
+            case above since its return message drives the LIVE/ERROR outcome being tested.</desc>
+
+setSharedStubs:
+    STUB.OFS.BLD = UTF.addStub("OFS.BUILD.RECORD")
+    UTF.addStubParam(STUB.OFS.BLD, UTF.any(), UTF.same())     ;* APP.NAME
+    UTF.addStubParam(STUB.OFS.BLD, UTF.any(), UTF.same())     ;* OFS.FUN
+    UTF.addStubParam(STUB.OFS.BLD, UTF.any(), UTF.same())     ;* PROCESS
+    UTF.addStubParam(STUB.OFS.BLD, UTF.any(), UTF.same())     ;* OFS.VERSION
+    UTF.addStubParam(STUB.OFS.BLD, UTF.any(), UTF.same())     ;* GTSMODE
+    UTF.addStubParam(STUB.OFS.BLD, UTF.any(), UTF.same())     ;* NO.OF.AUTH
+    UTF.addStubParam(STUB.OFS.BLD, UTF.any(), UTF.same())     ;* TRANSACTION.ID
+    UTF.addStubParam(STUB.OFS.BLD, UTF.any(), UTF.same())     ;* Y.OFS.REC / Y.OFS.CONTRA.REC
+    UTF.addStubParam(STUB.OFS.BLD, UTF.any(), "DUMMY.OFS.RECORD.STRING")  ;* OFS.RECORD (built message)
+    UTF.setRepeatable(STUB.OFS.BLD)
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Set details common for all test cases>
+*** <desc> LOCAL.REF positions and business constants below are placeholders standing in for
+            symbols normally supplied by I_B.SCB.PVB.EQD.AGGREGATED.TRANS.COMMON - verify each
+            one against your environment and adjust if different. If any of these are actually
+            compiled EQUATEs rather than plain COMMON variables in that insert, these direct
+            assignments will fail to compile - replace them with the real values instead.</desc>
+
+setSharedDetails:
+
+    ID.COMPANY = 'HK0010001'
+
+*   SC.STR.LOCAL.REF positions used when building the SECURITY.TRANSFER OFS message
+    Y.BO.STATUS.POS              = '1'
+    Y.LWM.95P.DEAG.POS           = '2'
+    Y.97ASAFE.DEA.REA.POS        = '3'
+    Y.LWM.95P.REAG.POS           = '4'
+    Y.95R.DEAG.REAG.POS          = '5'
+    Y.LWM.95P.PSET.BIC.POS       = '6'
+    Y.AT.STAMP.CODE.POS          = '7'
+    Y.AT.TRAD.EXCH.POS           = '8'
+    Y.LWM.TAG.95P.BUYSEL.BIC.POS = '9'
+    Y.L95R.BUYRSELL.POS          = '10'
+    Y.LWM.ST.GRP.ID.POS          = '11'
+    Y.95Q.DEAG.REAG.POS          = '12'
+    Y.19A.STMP.DUTY.AMT.POS      = '13'
+    Y.97A.SAFE.FIAC.POS          = '14'
+
+*   SC.SSI.LOCAL.REF positions used when reading settlement instructions
+    POS.SSI.95P.DEAG = '1'
+    POS.SSI.95Q.DEAG = '2'
+    POS.SSI.SELL.95P = '3'
+    POS.SSI.95P.REAG = '4'
+    POS.SSI.95Q.REAG = '5'
+    POS.SSI.BUYR.95P = '6'
+    Y.LWM.SSI.95P.DEAG.POS = POS.SSI.95P.DEAG
+    Y.LWM.SSI.95Q.DEAG.POS = POS.SSI.95Q.DEAG
+    Y.SSI.SELL.95P.POS     = POS.SSI.SELL.95P
+    Y.LWM.SSI.95P.REAG.POS = POS.SSI.95P.REAG
+    Y.LWM.SSI.95Q.REAG.POS = POS.SSI.95Q.REAG
+    Y.SSI.BUYR.95P.POS     = POS.SSI.BUYR.95P
+
+*   Business constants normally supplied via I_B.SCB.PVB.EQD.AGGREGATED.TRANS.COMMON
+    Y.EQD.AGG.CUS.SG      = '2001001'
+    Y.EQD.AGG.CUS.HK      = '3001001'
+    Y.EQD.AGG.TXN.BUY     = 'BUY'
+    Y.EQD.AGG.TXN.SELL    = 'SELL'
+    Y.EQD.AGG.STK.EXCH.SEHK = 'SEHK'
+    Y.EQD.AGG.STK.EXCH.LSE  = 'LSE'
+    Y.EQD.AGG.STK.EXCH.SGX  = 'SGX'
+    Y.EQD.AGG.VER.BUY     = 'EQD.AGG.BUY'
+    Y.EQD.AGG.VER.SELL    = 'EQD.AGG.SELL'
+    Y.EQD.AGG.TRANS.BROKER  = 'BRK001'
+    Y.EQD.AGG.OFS.SOURCE    = 'EQD.AGG.SRC'
+    Y.EQD.CON.AGG.OFS.SOURCE = 'EQD.CON.AGG.SRC'
+
+    RETURN
+*** </region>
 *-----------------------------------------------------------------------------
 END
