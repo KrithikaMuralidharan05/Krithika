@@ -1,0 +1,157 @@
+TESTCASE SCB.TR.TELE.REPORT
+*-----------------------------------------------------------------------------
+* @author     :  V V Sriniketh
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 13-July-2026 - T24 TDS Price Convergence - Tolerance Report Changes - ADO-14318681 - V V Sriniketh
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+ 
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_BATCH.FILES
+    $INSERT I_F.SECURITY.MASTER
+    $INSERT I_F.SCB.WM.H.LOCAL.PARAM
+    $INSERT I_SCB.TR.TELE.REPORT.COMMON
+    $INSERT I_F.SCB.TR.PRICE.RESPONSE
+    
+    UTF.setTarget("SCB.TR.TELE.REPORT")                    ;* Name of the Target routine for which test is done
+    UTF.setDescription("Test the SCB.TR.TELE.REPORT routine") ;* Default description for all tests
+    GOSUB runtest1                                  
+    GOSUB runtest2                                  
+    GOSUB runtest3                                  
+    GOSUB runtest4 
+    GOSUB runtest5
+                                     
+RETURN
+*-----------------------------------------------------------------------------
+runtest1:
+**********
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("069076-260")
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    
+    R.SM = ''
+    R.SM<SC.SCM.SHORT.NAME> = 'Wharf REIC Finance BVI Ltd WREICL 2'
+    R.SM<SC.SCM.LOCAL.REF,1,1> = '100'
+    R.SM<SC.SCM.STK.EXCH.PRICE> = '361'
+    R.SM<SC.SCM.LOCAL.REF,2,1> = '20260107'
+    R.SM<SC.SCM.LOCAL.REF,3> =''
+    R.SM<SC.SCM.LAST.PRICE,1> = '100'
+    R.SM<SC.SCM.DATE.LAST.PRICE> = '20260112'
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'SGD'
+    R.SM<SC.SCM.SUB.ASSET.TYPE> = '100'
+    R.SM<SC.SCM.PRICE.UPDATE.CODE> = '40'
+    UTF.setRecord('F.SECURITY.MASTER', "069076-260", R.SM)
+    
+    UTF.runTest("Test the SCB.TR.TELE.REPORT routine")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest2:
+**********
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("069076-260")
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    
+    R.SM = ''
+    R.SM<SC.SCM.SHORT.NAME> = 'Wharf REIC Finance BVI Ltd WREICL 2'
+    R.SM<SC.SCM.LOCAL.REF,1,1> = ''
+    R.SM<SC.SCM.STK.EXCH.PRICE> = '361'
+    R.SM<SC.SCM.LOCAL.REF,2,1> = '20260112'
+    R.SM<SC.SCM.LOCAL.REF,3> = ''
+    R.SM<SC.SCM.LAST.PRICE,1> = '100'
+    R.SM<SC.SCM.DATE.LAST.PRICE> = '20260112'
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'SGD'
+    R.SM<SC.SCM.SUB.ASSET.TYPE> = '100'
+    R.SM<SC.SCM.PRICE.UPDATE.CODE> = '40'
+    UTF.setRecord('F.SECURITY.MASTER', "069076-260", R.SM)
+    UTF.runTest("Test the SCB.TR.TELE.REPORT routine")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest3:
+**********
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("069076-260")
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    
+    R.SM = ''
+    R.SM<SC.SCM.SHORT.NAME> = 'Wharf REIC Finance BVI Ltd WREICL 2'
+    R.SM<SC.SCM.LOCAL.REF,1,1> = '94'
+    R.SM<SC.SCM.STK.EXCH.PRICE> = '361'
+    R.SM<SC.SCM.LOCAL.REF,2,1> = '20260112'
+    R.SM<SC.SCM.LOCAL.REF,3> =''
+    R.SM<SC.SCM.LAST.PRICE,1> = '100'
+    R.SM<SC.SCM.DATE.LAST.PRICE> = '20260112'
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'SGD'
+    R.SM<SC.SCM.SUB.ASSET.TYPE> = '100'
+    R.SM<SC.SCM.PRICE.UPDATE.CODE> = '40'
+    UTF.setRecord('F.SECURITY.MASTER', "069076-260", R.SM)
+    UTF.runTest("Test the SCB.TR.TELE.REPORT routine")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest4:
+**********
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("069076-260")
+    GOSUB setSharedDetails ;*Commons if any required for all test cases
+    
+    R.SM = ''
+    R.SM<SC.SCM.SHORT.NAME> = 'Wharf REIC Finance BVI Ltd WREICL 2'
+    R.SM<SC.SCM.LOCAL.REF,1,1> = '100'
+    R.SM<SC.SCM.STK.EXCH.PRICE> = '361'
+    R.SM<SC.SCM.LOCAL.REF,2,1> = '20260112'
+    R.SM<SC.SCM.LOCAL.REF,3> = ''
+    R.SM<SC.SCM.LAST.PRICE,1> = '100'
+    R.SM<SC.SCM.DATE.LAST.PRICE> = '20260112'
+    R.SM<SC.SCM.SECURITY.CURRENCY> = 'SGD'
+    R.SM<SC.SCM.SUB.ASSET.TYPE> = '100'
+    R.SM<SC.SCM.PRICE.UPDATE.CODE> = '40'
+    UTF.setRecord('F.SECURITY.MASTER', "069076-260", R.SM)
+    UTF.runTest("Test the SCB.TR.TELE.REPORT routine")
+    UTF.assertTrue("TRUE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+runtest5:
+**********
+    UTF.reset() ;* Reset all
+
+    UTF.addParam("069076-260")
+    
+    UTF.runTest("Test the SCB.TR.TELE.REPORT routine")
+    UTF.assertTrue("FALSE")
+    
+RETURN
+*-----------------------------------------------------------------------------
+setSharedDetails:
+*****************
+    FN.SCB.TR.PRICE.RESPONSE = 'F.SCB.TR.PRICE.RESPONSE'
+    F.SCB.TR.PRICE.RESPONSE = 'F.SCB.TR.PRICE.RESPONSE'
+    
+    FN.SECURITY.MASTER = 'F.SECURITY.MASTER'
+    F.SECURITY.MASTER = 'F.SECURITY.MASTER'
+    
+    Y.VDF.PRICE.POS = '1'
+    Y.VDF.PRC.DATE.POS = '2'
+    Y.RIC.CODE.POS = '3'
+    R.PRICE.REC = ''
+    R.PRICE.REC<SCB.PR.UNIV.CLOSE.PRICE> = '95'
+    R.PRICE.REC<SCB.PR.UNIV.CLOSE.PRICE.DATE> = '20260109'
+    R.PRICE.REC<SCB.PR.CURRENCY> = 'SGD'
+    UTF.setRecord("F.SCB.TR.PRICE.RESPONSE","069076-260",R.PRICE.REC)
+    
+RETURN
+*-----------------------------------------------------------------------------
+END
