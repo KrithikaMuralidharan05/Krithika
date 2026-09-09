@@ -15,6 +15,7 @@ SUBROUTINE SCB.EQD.NOF.ENQ.ST.GRP(FINAL.ARRAY)
 *-----------------------------------------------------------------------------
 * Modification History :
 ** 9th July 2026    12129747   Kavitha		- Enquiry to Display Aggregated Transfers along with their Corresponding Individual Trades
+** 17th Aug 2026    15719043   Krithika     - Amend the filter criteria in the view aggregated Trade details for "Trade date" and add "between", similar to Authorization date
 *-----------------------------------------------------------------------------
 *Attached to ENQUIRY>SCB.ENQ.TRADE.GROUP, SS>NOFILE.SCB.ENQ.TRADE.GROUP
 *-----------------------------------------------------------------------------
@@ -71,14 +72,51 @@ INIT:
 
 RETURN
 
+GETOPERAND:
+***********
+*//Forming operands based on the selection operands provided by the user
+    Y.OPER = ''
+*
+    BEGIN CASE
+        CASE Y.OPER.VAL = 1
+            Y.OPER = 'EQ'
+        CASE Y.OPER.VAL = 2
+            Y.OPER = 'RG'
+		CASE Y.OPER.VAL = 3
+            Y.OPER = 'LT'
+		CASE Y.OPER.VAL = 4
+            Y.OPER = 'GT'
+        CASE Y.OPER.VAL = 5
+            Y.OPER = 'NE'
+		CASE Y.OPER.VAL = 8
+            Y.OPER = 'LE'
+		CASE Y.OPER.VAL = 9
+            Y.OPER = 'GE'
+    END CASE
+*
+RETURN
+
 SELECT.PROCESS:
 ***************
 
-    SEL.CMD = ''; SEL.LIST = ''; SEL.CNT = ''; SEL.ERR = ''; FINAL.ARRAY = ''; Y.ST.ID = ''; SEC.ERR = ''; SEL.FLD.POS = '';Y.DISPOSITION =''
+    SEL.CMD = ''; SEL.LIST = ''; SEL.CNT = ''; SEL.ERR = ''; FINAL.ARRAY = ''; Y.ST.ID = ''; SEC.ERR = ''; SEL.FLD.POS = ''
 
     LOCATE 'TRADE.DATE' IN D.FIELDS<1> SETTING SEL.FLD.POS THEN
-        ENQ.TRADE.DATE = D.RANGE.AND.VALUE<SEL.FLD.POS>
-	SEL.CMD = 'SSELECT ':FN.SCB.PVB.EQD.GROUP.TODAY:' WITH TRADE.DATE EQ ':ENQ.TRADE.DATE:	
+    
+	SEL.CMD = 'SELECT ':FN.SCB.PVB.EQD.GROUP.TODAY:' WITH TRADE.DATE '
+	 ENQ.TRADE.DATE = D.RANGE.AND.VALUE<SEL.FLD.POS>
+        Y.OPER.VAL = D.LOGICAL.OPERANDS<SEL.FLD.POS>
+		GOSUB GETOPERAND
+            BEGIN CASE
+        CASE Y.OPER.VAL NE 2
+            SEL.CMD := Y.OPER:" " :ENQ.TRADE.DATE
+			
+        CASE Y.OPER.VAL = 2  
+		CONVERT @SM TO @VM IN ENQ.TRADE.DATE		
+            SEL.CMD := " GE":' ':ENQ.TRADE.DATE<1,1>:' AND TRADE.DATE ':"LE":' ':ENQ.TRADE.DATE<1,2>
+			
+        END CASE            
+
     END
 
       LOCATE 'DEPOSITORY' IN D.FIELDS<1> SETTING SEL.FLD.POS THEN
@@ -90,21 +128,48 @@ SELECT.PROCESS:
         E.STK.EX = D.RANGE.AND.VALUE<SEL.FLD.POS>
         SEL.CMD := ' AND STOCK.EXCHANGE EQ ':E.STK.EX
     END
-					
-    LOCATE 'AUTHORISATION.DATE' IN D.FIELDS<1> SETTING SEL.FLD.POS THEN
+	
+	 LOCATE 'AGGREGATED.TRANSFER.ID' IN D.FIELDS<1> SETTING SEL.FLD.POS THEN
+        Y.AGGREGATED.ID = D.RANGE.AND.VALUE<SEL.FLD.POS>
+		SEL.CMD := ' AND AGGREGATED.TRANSFER.ID EQ ':Y.AGGREGATED.ID
+    END
+	
+	 LOCATE 'SEC.TRADE.ID' IN D.FIELDS<1> SETTING SEL.FLD.POS THEN
+        Y.SEC.TRADE.ID = D.RANGE.AND.VALUE<SEL.FLD.POS>
+		SEL.CMD := ' AND SEC.TRADE.ID EQ ':Y.SEC.TRADE.ID
+    END
+				
+    LOCATE 'AUTH.DATE' IN D.FIELDS<1> SETTING SEL.FLD.POS THEN
         ENQ.AUTH.DATE = D.RANGE.AND.VALUE<SEL.FLD.POS>
         Y.OPER.VAL = D.LOGICAL.OPERANDS<SEL.FLD.POS>
+        GOSUB GETOPERAND
             BEGIN CASE
-        CASE Y.OPER.VAL = 1
-            Y.OPER = 'EQ'
-            SEL.CMD := ' AND AUTH.DATE EQ ':ENQ.AUTH.DATE
-        CASE Y.OPER.VAL = 2
-            Y.OPER = 'RG'
-	CONVERT @SM TO @VM IN ENQ.AUTH.DATE
-          
-            SEL.CMD := ' AND AUTH.DATE ':"GE":' ':ENQ.AUTH.DATE<1,1>:' AND AUTH.DATE ':"LE":' ':ENQ.AUTH.DATE<1,2>
+        CASE Y.OPER.VAL NE 2
+            SEL.CMD := ' AND AUTH.DATE ':Y.OPER:" " :ENQ.AUTH.DATE
+			
+        CASE Y.OPER.VAL = 2  
+		CONVERT @SM TO @VM IN ENQ.AUTH.DATE		
+            SEL.CMD := " AND AUTH.DATE GE":' ':ENQ.AUTH.DATE<1,1>:' AND AUTH.DATE ':"LE":' ':ENQ.AUTH.DATE<1,2>
+			
+        END CASE             
+    END		
+	
+	LOCATE 'VALUE.DATE' IN D.FIELDS<1> SETTING SEL.FLD.POS THEN
+        ENQ.VALUE.DATE = D.RANGE.AND.VALUE<SEL.FLD.POS>
+        Y.OPER.VAL = D.LOGICAL.OPERANDS<SEL.FLD.POS>
+          GOSUB GETOPERAND
+            BEGIN CASE
+        CASE Y.OPER.VAL NE 2
+            SEL.CMD := ' AND VALUE.DATE ':Y.OPER:" " :ENQ.VALUE.DATE
+			
+        CASE Y.OPER.VAL = 2  
+		CONVERT @SM TO @VM IN ENQ.VALUE.DATE		
+            SEL.CMD := "AND VALUE.DATE GE":' ':ENQ.VALUE.DATE<1,1>:' AND VALUE.DATE ':"LE":' ':ENQ.VALUE.DATE<1,2>
+			
         END CASE            
     END		
+	
+	
     CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
 
     LOOP
@@ -169,6 +234,7 @@ RETURN
 
 SEC.TFR.DETAILS:
 *****************
+    
     IF Y.SEC.TFR.ID THEN
     CALL F.READ(FN.SECURITY.TRANSFER,Y.SEC.TFR.ID,R.SECURITY.TRANSFER,F.SECURITY.TRANSFER,SEC.ERR)
 
@@ -178,7 +244,7 @@ SEC.TFR.DETAILS:
 	Y.TRANSFER.CCY = R.SECURITY.TRANSFER<SC.STR.SECURITY.CCY>	
 	Y.DELIVERY.REF = R.SECURITY.TRANSFER< SC.STR.DELIVERY.KEY>
     Y.ACCOUNT = R.SECURITY.TRANSFER<SC.STR.LOCAL.REF,Y.LWM.POS>	 
-      	 	 	 
+    	 	 	 
        IF Y.DELIVERY.REF THEN	 	 	 
        GOSUB GET.DELIVERY.DETAILS	 	 	 
        END
@@ -195,7 +261,9 @@ SEC.TFR.DETAILS:
 RETURN
 
 GET.DELIVERY.DETAILS:	 	 	 
-*********************	 	 	 
+*********************
+	 	 	 
+ 
  LOOP  	 	 	  
     REMOVE Y.DOH.ID FROM Y.DELIVERY.REF SETTING DOH.ID.POS		 	 
     WHILE Y.DOH.ID : DOH.ID.POS	 	 	 
@@ -231,5 +299,6 @@ WRITE.ARRAY:
 	END ELSE
         FINAL.ARRAY<-1> = Y.SEC.TFR.ID:'*':Y.NO.NOMINAL:'*':Y.TRANSFER.CCY:'*':Y.BR.NET.AMT:'*':Y.SEC.TRADE.ID:'*':Y.QTY:'*':Y.TRD.CCY:'*':Y.BR.GROSS.AMT.TRD:'*':Y.BR.MISS.FEE:'*':Y.STK.EXCH.DES:'*':Y.DEPO:'*':Y.TRADE:'*':Y.VALUE:'*':Y.CUST.CODE:'*':Y.ACCOUNT:'*':Y.ISIN :'*':Y.AUTH.DATE:'*':Y.SEC.TFR.STATUS:'*':Y.SEC.TFR.ERR:"*":Y.TRANSACTION.CODE:"*":Y.DISPOSITION
 	END
+    Y.DISPOSITION = ''
 *
 RETURN
