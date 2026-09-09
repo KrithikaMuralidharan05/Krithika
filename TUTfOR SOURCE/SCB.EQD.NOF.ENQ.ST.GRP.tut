@@ -29,6 +29,12 @@ TESTCASE SCB.EQD.NOF.ENQ.ST.GRP
     GOSUB runtest4      ;* Group not yet aggregated (no id, no error) -> "Transfer Not Initiated"
     GOSUB runtest5      ;* Transfer has a delivery key -> GET.DELIVERY.DETAILS reads DE.O.HEADER for the MT541/543 disposition
     GOSUB runtest6      ;* Trade no longer on the live file -> falls back to F.SEC.TRADE$HIS via EB.READ.HISTORY.REC
+    GOSUB runtest7      ;* TRADE.DATE as a range (RG) + DEPOSITORY/Stk.Exch/AGGREGATED.TRANSFER.ID filters
+    GOSUB runtest8      ;* AUTH.DATE with LT, VALUE.DATE with GT
+    GOSUB runtest9      ;* AUTH.DATE as a range (RG)
+    GOSUB runtest10     ;* VALUE.DATE as a range (RG)
+    GOSUB runtest11     ;* AUTH.DATE with NE, VALUE.DATE with LE
+    GOSUB runtest12     ;* AUTH.DATE with GE
 *
     RETURN
 *** </region>
@@ -309,12 +315,18 @@ runtest5:
     R.STR = ''
     R.STR<SC.STR.NO.NOMINAL> = '1000'
     R.STR<SC.STR.DELIVERY.KEY,1> = 'DOH0001'
+    R.STR<SC.STR.DELIVERY.KEY,2> = 'DOH0002'   ;* second id added purely to also exercise the MT543 branch below
     UTF.setRecord("F.SECURITY.TRANSFER", "SECTSC2601293104", R.STR)
 
     R.DOH = ''
     R.DOH<DE.HDR.MESSAGE.TYPE> = '541'
     R.DOH<DE.HDR.MSG.DISP,1> = 'MATCHED'
     UTF.setRecord("F.DE.O.HEADER", "DOH0001", R.DOH)
+
+    R.DOH2 = ''
+    R.DOH2<DE.HDR.MESSAGE.TYPE> = '543'
+    R.DOH2<DE.HDR.MSG.DISP,1> = 'SETTLED'
+    UTF.setRecord("F.DE.O.HEADER", "DOH0002", R.DOH2)
 
     R.TRD = ''
     R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST001'
@@ -385,6 +397,344 @@ runtest6:
     UTF.runTest("Trade missing from the live file falls back to the history file")
 * doAssertions for this testcase
     UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',14), "CUST001")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase7>
+*** <desc> Coverage case - TRADE.DATE supplied as a range (operand RG=2, exercising the
+            CONVERT @SM TO @VM / GE..LE branch), plus DEPOSITORY, Stk.Exch and
+            AGGREGATED.TRANSFER.ID all supplied together, exercising the three LOCATE blocks
+            that no earlier test case touches</desc>
+
+runtest7:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0010.HKSCC.HKD.SEHK.CUST010.12.00.20260615.20260617.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'DEPOSITORY'
+    D.FIELDS<1,3> = 'Stk.Exch'
+    D.FIELDS<1,4> = 'AGGREGATED.TRANSFER.ID'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260601':@SM:'20260630'
+    D.RANGE.AND.VALUE<2> = 'HKSCC'
+    D.RANGE.AND.VALUE<3> = 'SEHK'
+    D.RANGE.AND.VALUE<4> = 'SECTSC2601293999'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '2'    ;* RG (range)
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0010'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '400'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260615'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260617'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = 'SECTSC2601293999'
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Hong Kong Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+    R.STR = ''
+    R.STR<SC.STR.NO.NOMINAL> = '400'
+    UTF.setRecord("F.SECURITY.TRANSFER", "SECTSC2601293999", R.STR)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST010'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0010'
+    UTF.setRecord("F.SEC.TRADE", "TRD0010", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'HK0000099999'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0010", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("TRADE.DATE range plus DEPOSITORY/Stk.Exch/AGGREGATED.TRANSFER.ID filters")
+* doAssertions for this testcase
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',5), "TRD0010")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase8>
+*** <desc> Coverage case - AUTH.DATE with operand LT(3) and VALUE.DATE with operand GT(4),
+            exercising the "operand NE 2" branch of GETOPERAND for both fields with a
+            non-EQ operator</desc>
+
+runtest8:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0011.HKSCC.HKD.SEHK.CUST011.8.00.20260620.20260625.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'AUTH.DATE'
+    D.FIELDS<1,3> = 'VALUE.DATE'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260620'
+    D.RANGE.AND.VALUE<2> = '20260701'
+    D.RANGE.AND.VALUE<3> = '20260610'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'    ;* EQ (mandatory field, unrelated to the coverage being added)
+    D.LOGICAL.OPERANDS<2> = '3'    ;* LT
+    D.LOGICAL.OPERANDS<3> = '4'    ;* GT
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0011'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '250'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260620'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260625'
+    R.GRP<SCB.EQD.ST.AUTH.DATE> = '20260615'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Hong Kong Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST011'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0011'
+    UTF.setRecord("F.SEC.TRADE", "TRD0011", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'HK0000011111'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0011", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("AUTH.DATE LT and VALUE.DATE GT operators")
+* doAssertions for this testcase
+    UTF.assertTrue("TRUE")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase9>
+*** <desc> Coverage case - AUTH.DATE supplied as a range (RG=2), exercising the
+            CONVERT @SM TO @VM / GE..LE branch inside the AUTH.DATE LOCATE block</desc>
+
+runtest9:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0012.HKSCC.HKD.SEHK.CUST012.9.00.20260618.20260620.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'AUTH.DATE'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260618'
+    D.RANGE.AND.VALUE<2> = '20260601':@SM:'20260630'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'    ;* EQ
+    D.LOGICAL.OPERANDS<2> = '2'    ;* RG (range)
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0012'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '150'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260618'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260620'
+    R.GRP<SCB.EQD.ST.AUTH.DATE> = '20260618'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Hong Kong Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST012'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0012'
+    UTF.setRecord("F.SEC.TRADE", "TRD0012", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'HK0000022222'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0012", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("AUTH.DATE supplied as a range")
+* doAssertions for this testcase
+    UTF.assertTrue("TRUE")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase10>
+*** <desc> Coverage case - VALUE.DATE supplied as a range (RG=2), exercising the
+            CONVERT @SM TO @VM / GE..LE branch inside the VALUE.DATE LOCATE block</desc>
+
+runtest10:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0013.HKSCC.HKD.SEHK.CUST013.7.00.20260619.20260621.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'VALUE.DATE'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260619'
+    D.RANGE.AND.VALUE<2> = '20260601':@SM:'20260630'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'    ;* EQ
+    D.LOGICAL.OPERANDS<2> = '2'    ;* RG (range)
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0013'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '600'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260619'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260621'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Hong Kong Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST013'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0013'
+    UTF.setRecord("F.SEC.TRADE", "TRD0013", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'HK0000033333'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0013", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("VALUE.DATE supplied as a range")
+* doAssertions for this testcase
+    UTF.assertTrue("TRUE")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase11>
+*** <desc> Coverage case - AUTH.DATE with operand NE(5) and VALUE.DATE with operand LE(8),
+            exercising the remaining unmapped GETOPERAND CASE lines</desc>
+
+runtest11:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0014.HKSCC.HKD.SEHK.CUST014.6.00.20260621.20260623.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'AUTH.DATE'
+    D.FIELDS<1,3> = 'VALUE.DATE'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260621'
+    D.RANGE.AND.VALUE<2> = '20260601'
+    D.RANGE.AND.VALUE<3> = '20260630'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'    ;* EQ
+    D.LOGICAL.OPERANDS<2> = '5'    ;* NE
+    D.LOGICAL.OPERANDS<3> = '8'    ;* LE
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0014'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '350'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260621'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260623'
+    R.GRP<SCB.EQD.ST.AUTH.DATE> = '20260616'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Hong Kong Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST014'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0014'
+    UTF.setRecord("F.SEC.TRADE", "TRD0014", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'HK0000044444'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0014", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("AUTH.DATE NE and VALUE.DATE LE operators")
+* doAssertions for this testcase
+    UTF.assertTrue("TRUE")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase12>
+*** <desc> Coverage case - AUTH.DATE with operand GE(9), the one GETOPERAND CASE line not
+            yet exercised by any earlier test</desc>
+
+runtest12:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0015.HKSCC.HKD.SEHK.CUST015.11.00.20260622.20260624.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'AUTH.DATE'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260622'
+    D.RANGE.AND.VALUE<2> = '20260601'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'    ;* EQ
+    D.LOGICAL.OPERANDS<2> = '9'    ;* GE
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0015'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '900'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260622'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260624'
+    R.GRP<SCB.EQD.ST.AUTH.DATE> = '20260617'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Hong Kong Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST015'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0015'
+    UTF.setRecord("F.SEC.TRADE", "TRD0015", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'HK0000055555'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0015", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("AUTH.DATE GE operator")
+* doAssertions for this testcase
+    UTF.assertTrue("TRUE")
 
 RETURN
 *** </region>
