@@ -1,12 +1,16 @@
 TESTCASE SCB.EQD.NOF.ENQ.ST.GRP
 *-----------------------------------------------------------------------------
-* @author     :
+* @author     :  Raghavan K
 *-----------------------------------------------------------------------------
 *
 *   Modification History :
 *
+*   9th July 2026    12129747   Kavitha  - Enquiry to Display Aggregated Transfers along with their Corresponding Individual Trades
+*   17th Aug 2026    15719043   Krithika - Amend the filter criteria in the view aggregated Trade details for "Trade date" and add "between", similar to Authorization date
 *
 *-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
     $INSERT I_COMMON
     $INSERT I_EQUATE
     $INSERT I_ENQUIRY.COMMON
@@ -17,138 +21,387 @@ TESTCASE SCB.EQD.NOF.ENQ.ST.GRP
     $INSERT I_F.SEC.TRADE
     $INSERT I_F.SECURITY.MASTER
 
-    UTF.setTarget("SCB.EQD.NOF.ENQ.ST.GRP")
-    UTF.setDescription("Test SCB.EQD.NOF.ENQ.ST.GRP routine")
-    GOSUB runtest1
-    GOSUB runtest2
-    GOSUB runtest3
-
+    UTF.setTarget("SCB.EQD.NOF.ENQ.ST.GRP")   ;* Name of the Target routine for which test is done
+    UTF.setDescription("NOFILE enquiry - lists aggregated transfers alongside their individual grouped trades")
+    GOSUB runtest1      ;* Included trade with a created transfer -> normal detail row
+    GOSUB runtest2      ;* Trade sitting in the NOT.INCLUDED list -> "Not Included" row
+    GOSUB runtest3      ;* Group has an OFS error captured -> "Transfer Not Created"
+    GOSUB runtest4      ;* Group not yet aggregated (no id, no error) -> "Transfer Not Initiated"
+    GOSUB runtest5      ;* Transfer has a delivery key -> GET.DELIVERY.DETAILS reads DE.O.HEADER for the MT541/543 disposition
+    GOSUB runtest6      ;* Trade no longer on the live file -> falls back to F.SEC.TRADE$HIS via EB.READ.HISTORY.REC
+*
     RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> One trade included in the group, its aggregated transfer already exists ->
+            SEC.TFR.DETAILS reads the transfer and SEC.TRD.DETAILS reads the trade/security
+            master, and a normal detail row is written to FINAL.ARRAY</desc>
 
 runtest1:
 
     UTF.reset() ;* Reset all
-    UTF.addParam("Param1")
-    GOSUB setSharedDetails
-    GOSUB setSharedStubs
-    GOSUB setSelectStub.Found
-    UTF.runTest("Testing enquiry with TRADE.DATE filter - group found with included trade")
-    UTF.assertEquals(UTF.getNbInvocation(ebrStub), "1")
-    TRD.REC = UTF.getRecord("F.SCB.PVB.EQD.GROUP.TODAY", GRP.ID)
-    UTF.assertEquals(TRD.REC<SCB.EQD.ST.SEC.TRADE.ID>, "ST12345")
+    GOSUB setSharedStubs        ;* MULTI.GET.LOC.REF stub required for all test cases
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0001.HKSCC.HKD.SEHK.CUST001.10.50.20260626.20260628.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'SEC.TRADE.ID'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260626'
+    D.RANGE.AND.VALUE<2> = 'TRD0001'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'    ;* EQ
+    D.LOGICAL.OPERANDS<2> = '1'    ;* EQ
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0001'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '1000'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260626'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260628'
+    R.GRP<SCB.EQD.ST.BR.GROSS.AMT.TRD,1> = '10100.00'
+    R.GRP<SCB.EQD.ST.BR.MISC.FEE,1> = '15.00'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = 'SECTSC2601293104'
+    R.GRP<SCB.EQD.ST.AGGREGATED.STATUS> = 'LIVE'
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    R.GRP<SCB.EQD.ST.AUTH.DATE> = '20260626'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Hong Kong Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+    R.STR = ''
+    R.STR<SC.STR.NO.NOMINAL> = '1000'
+    R.STR<SC.STR.BR.NET.AMT> = '10085.00'
+    R.STR<SC.STR.TRANSACTION.TYPE> = 'BUY'
+    R.STR<SC.STR.SECURITY.CCY> = 'HKD'
+    R.STR<SC.STR.DELIVERY.KEY> = ''
+    R.STR<SC.STR.LOCAL.REF,1> = 'ACC0001'
+    UTF.setRecord("F.SECURITY.TRANSFER", "SECTSC2601293104", R.STR)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST001'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0001'
+    UTF.setRecord("F.SEC.TRADE", "TRD0001", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'HK0000012345'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0001", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("Included trade with an existing transfer produces a normal detail row")
+* doAssertions for this testcase
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',1), "SECTSC2601293104")
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',5), "TRD0001")
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',6), "1000")
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',10), "Hong Kong Stock Exchange")
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',15), "ACC0001")
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',16), "HK0000012345")
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',18), "LIVE")
 
 RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> Trade recorded only in SEC.TRADE.ID.NOT.INCLUDED -> the NOT.INCLUDED loop runs
+            instead of the main trade loop and the row is labelled "Not Included"</desc>
 
 runtest2:
 
     UTF.reset() ;* Reset all
-    UTF.addParam("Param1")
-    GOSUB setSharedDetails
     GOSUB setSharedStubs
-    GOSUB setSelectStub.NotFound
-    UTF.runTest("Testing enquiry with no group matching the selection criteria")
-    UTF.assertEquals(UTF.getNbInvocation(ebrStub), "1")
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0002.CDP.SGD.SGX.CUST002.5.25.20260627.20260629.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'SEC.TRADE.ID'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260627'
+    D.RANGE.AND.VALUE<2> = 'TRD0099'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'
+    D.LOGICAL.OPERANDS<2> = '1'
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID.NOT.INCLUDED,1> = 'TRD0099'
+    R.GRP<SCB.EQD.ST.QUANTITY.NOT.INCLUDED,1> = '2000'
+    R.GRP<SCB.EQD.ST.TRADE.DATE.NOT.INCLUDED,1> = '20260627'
+    R.GRP<SCB.EQD.ST.VALUE.DATE.NOT.INCLUDED,1> = '20260629'
+    R.GRP<SCB.EQD.ST.BR.GROSS.AMT.TRD.NOT.INCLUDED,1> = '10500.00'
+    R.GRP<SCB.EQD.ST.BR.MISC.FEE1.NOT.INCLUDED,1> = '5.00'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260627'
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0099'   ;* also matches the SELECT criteria so the group is picked up
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Singapore Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SGX", R.STE)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST002'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0002'
+    UTF.setRecord("F.SEC.TRADE", "TRD0099", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'SG0000098765'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0002", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("Trade only in the NOT.INCLUDED list is labelled Not Included")
+* doAssertions for this testcase
+    UTF.assertEquals(FIELD(FINAL.ARRAY<-1>,'*',1), "Not Included")
+    UTF.assertEquals(FIELD(FINAL.ARRAY<-1>,'*',5), "TRD0099")
+    UTF.assertEquals(FIELD(FINAL.ARRAY<-1>,'*',6), "2000")
 
 RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase3>
+*** <desc> Group has no aggregated transfer id but does have an ERROR captured (the OFS build
+            or send failed) -> ELSE branch of SEC.TFR.DETAILS sets "Transfer Not Created"</desc>
 
 runtest3:
 
     UTF.reset() ;* Reset all
-    UTF.addParam("Param1")
-    GOSUB setSharedDetails
     GOSUB setSharedStubs
-    GOSUB setSelectStub.Found
-*   override the enquiry criteria for this test - AUTHORISATION.DATE range (operand 2)
-    D.FIELDS = ''; D.RANGE.AND.VALUE = ''; D.LOGICAL.OPERANDS = ''
-    D.FIELDS<1,1> = 'AUTHORISATION.DATE'
-    D.RANGE.AND.VALUE<1> = '20260701':@SM:'20260731'
-    D.LOGICAL.OPERANDS<1> = '2'
-    UTF.runTest("Testing enquiry with AUTHORISATION.DATE range filter")
-    UTF.assertEquals(UTF.getNbInvocation(ebrStub), "1")
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0003.DTC.USD.NYSE.CUST003.30.75.20260628.20260630.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'SEC.TRADE.ID'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260628'
+    D.RANGE.AND.VALUE<2> = 'TRD0005'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'
+    D.LOGICAL.OPERANDS<2> = '1'
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0005'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '750'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260628'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260630'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.GRP<SCB.EQD.ST.ERROR> = 'Insufficient balance'
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'New York Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "NYSE", R.STE)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST003'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0003'
+    UTF.setRecord("F.SEC.TRADE", "TRD0005", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'US0000054321'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0003", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("Group with a captured OFS error shows Transfer Not Created")
+* doAssertions for this testcase
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',1), " Transfer Not Created")
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',19), "Insufficient balance")
 
 RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase4>
+*** <desc> Group has neither an aggregated transfer id nor an ERROR -> ELSE branch of
+            SEC.TFR.DETAILS sets "Transfer Not Initiated" (batch has not run yet)</desc>
+
+runtest4:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0004.CREST.GBP.LSE.CUST004.20.00.20260629.20260701.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'SEC.TRADE.ID'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260629'
+    D.RANGE.AND.VALUE<2> = 'TRD0006'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'
+    D.LOGICAL.OPERANDS<2> = '1'
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0006'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '500'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260629'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260701'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'London Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "LSE", R.STE)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST004'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0004'
+    UTF.setRecord("F.SEC.TRADE", "TRD0006", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'GB0000011111'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0004", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("Group not yet aggregated shows Transfer Not Initiated")
+* doAssertions for this testcase
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',1), " Transfer Not Initiated")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase5>
+*** <desc> Transfer carries a delivery key -> GET.DELIVERY.DETAILS reads F.DE.O.HEADER for
+            each id in the key and captures the disposition of an MT541/543 message</desc>
+
+runtest5:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0001.HKSCC.HKD.SEHK.CUST001.10.50.20260626.20260628.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'SEC.TRADE.ID'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260626'
+    D.RANGE.AND.VALUE<2> = 'TRD0001'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'
+    D.LOGICAL.OPERANDS<2> = '1'
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0001'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '1000'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260626'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260628'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = 'SECTSC2601293104'
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Hong Kong Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+    R.STR = ''
+    R.STR<SC.STR.NO.NOMINAL> = '1000'
+    R.STR<SC.STR.DELIVERY.KEY,1> = 'DOH0001'
+    UTF.setRecord("F.SECURITY.TRANSFER", "SECTSC2601293104", R.STR)
+
+    R.DOH = ''
+    R.DOH<DE.HDR.MESSAGE.TYPE> = '541'
+    R.DOH<DE.HDR.MSG.DISP,1> = 'MATCHED'
+    UTF.setRecord("F.DE.O.HEADER", "DOH0001", R.DOH)
+
+    R.TRD = ''
+    R.TRD<SC.SBS.CUST.TRANS.CODE> = 'CUST001'
+    R.TRD<SC.SBS.SECURITY.CODE> = 'SEC0001'
+    UTF.setRecord("F.SEC.TRADE", "TRD0001", R.TRD)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'HK0000012345'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0001", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("MT541 delivery message sets the disposition on the detail row")
+* doAssertions for this testcase
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',21), "MATCHED")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase6>
+*** <desc> Trade no longer exists on the live SEC.TRADE file (e.g. it has been superseded) ->
+            F.READ fails and the routine falls back to EB.READ.HISTORY.REC on F.SEC.TRADE$HIS</desc>
+
+runtest6:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    Y.GRP.ID = 'EQD.1.SEC0001.HKSCC.HKD.SEHK.CUST001.10.50.20260626.20260628.20260830'
+
+    D.FIELDS = ''
+    D.FIELDS<1,1> = 'TRADE.DATE'
+    D.FIELDS<1,2> = 'SEC.TRADE.ID'
+    D.RANGE.AND.VALUE = ''
+    D.RANGE.AND.VALUE<1> = '20260626'
+    D.RANGE.AND.VALUE<2> = 'TRD0007-1'
+    D.LOGICAL.OPERANDS = ''
+    D.LOGICAL.OPERANDS<1> = '1'
+    D.LOGICAL.OPERANDS<2> = '1'
+
+    R.GRP = ''
+    R.GRP<SCB.EQD.ST.SEC.TRADE.ID,1> = 'TRD0007-1'
+    R.GRP<SCB.EQD.ST.QUANTITY,1> = '300'
+    R.GRP<SCB.EQD.ST.TRADE.DATE,1> = '20260626'
+    R.GRP<SCB.EQD.ST.VALUE.DATE,1> = '20260628'
+    R.GRP<SCB.EQD.ST.AGGREGATED.TRANSFER.ID> = ''
+    R.GRP<SCB.EQD.ST.ERROR> = ''
+    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", Y.GRP.ID, R.GRP)
+
+    R.STE = ''
+    R.STE<SC.STE.DESCRIPTION,1> = 'Hong Kong Stock Exchange'
+    UTF.setRecord("F.STOCK.EXCHANGE", "SEHK", R.STE)
+
+*   deliberately no UTF.setRecord for F.SEC.TRADE "TRD0007" - forces the live read to fail
+    R.TRD.HIS = ''
+    R.TRD.HIS<SC.SBS.CUST.TRANS.CODE> = 'CUST001'
+    R.TRD.HIS<SC.SBS.SECURITY.CODE> = 'SEC0001'
+    UTF.setRecord("F.SEC.TRADE$HIS", "TRD0007", R.TRD.HIS)
+
+    R.SM = ''
+    R.SM<SC.SCM.I.S.I.N.> = 'HK0000012345'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0001", R.SM)
+* set stubs for this test
+* addParameter
+    FINAL.ARRAY = ''
+    UTF.addParam(FINAL.ARRAY)
+    UTF.runTest("Trade missing from the live file falls back to the history file")
+* doAssertions for this testcase
+    UTF.assertEquals(FIELD(FINAL.ARRAY<1>,'*',14), "CUST001")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Stubs common for all test cases>
+*** <desc> INIT calls MULTI.GET.LOC.REF once to resolve the 97A.SAFE.FIAC local ref position
+            on SECURITY.TRANSFER - stub it to hand back position 1, and set R.STR's LOCAL.REF
+            at that same position in each test that needs the Account column populated.</desc>
 
 setSharedStubs:
+    STUB.LOC = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB.LOC, UTF.any(), UTF.same())    ;* LOC.REF.APP ('SECURITY.TRANSFER')
+    UTF.addStubParam(STUB.LOC, UTF.any(), UTF.same())    ;* LOC.REF.FLD ('97A.SAFE.FIAC')
+    UTF.addStubParam(STUB.LOC, UTF.any(), '1')            ;* LOC.REF.POS output -> position 1
+    UTF.setRepeatable(STUB.LOC)
 
-    multiGetLocRefStub = UTF.addStub("MULTI.GET.LOC.REF")
-    UTF.addStubParam(multiGetLocRefStub, "SECURITY.TRANSFER", UTF.same())
-    UTF.addStubParam(multiGetLocRefStub, "97A.SAFE.FIAC", UTF.same())
-    UTF.addStubParam(multiGetLocRefStub, UTF.any(), '1')
-    UTF.setRepeatable(multiGetLocRefStub)
-
-RETURN
-
-setSelectStub.Found:
-*   CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR) - GRP.ID set in setSharedDetails
-    ebrStub = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(ebrStub, UTF.any(), UTF.same())        ;* SEL.CMD (in)
-    UTF.addStubParam(ebrStub, UTF.any(), GRP.ID)             ;* SEL.LIST (out)
-    UTF.addStubParam(ebrStub, UTF.any(), UTF.same())        ;* list name (in, blank)
-    UTF.addStubParam(ebrStub, UTF.any(), '1')                ;* SEL.CNT (out)
-    UTF.addStubParam(ebrStub, UTF.any(), UTF.same())        ;* SEL.ERR (out)
-    UTF.setRepeatable(ebrStub)
-
-RETURN
-
-setSelectStub.NotFound:
-
-    ebrStub = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(ebrStub, UTF.any(), UTF.same())        ;* SEL.CMD (in)
-    UTF.addStubParam(ebrStub, UTF.any(), '')                  ;* SEL.LIST (out) - nothing found
-    UTF.addStubParam(ebrStub, UTF.any(), UTF.same())        ;* list name (in, blank)
-    UTF.addStubParam(ebrStub, UTF.any(), '0')                 ;* SEL.CNT (out)
-    UTF.addStubParam(ebrStub, UTF.any(), UTF.same())        ;* SEL.ERR (out)
-
-RETURN
-
-setSharedDetails:
-
-    D.FIELDS = ''; D.RANGE.AND.VALUE = ''; D.LOGICAL.OPERANDS = ''
-    D.FIELDS<1,1> = 'TRADE.DATE'
-    D.RANGE.AND.VALUE<1> = '20260727'
-
-    GRP.ID = 'EQD.1.200836-000.6010.SGD.120'
-
-*   -- Group record (SCB.PVB.EQD.GROUP.TODAY)
-    R.SCB.PVB.EQD.GROUP.TODAY = ''
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.ERROR>                     = ''
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID>              = 'ST12345'
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.TRANSFER.ID>    = 'SECTSC2601293104'
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AGGREGATED.STATUS>         = 'AGGR'
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.AUTH.DATE>                 = '20260728'
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.QUANTITY>                  = '1000'
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.TRADE.DATE>                = '20260727'
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.VALUE.DATE>                = '20260729'
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.BR.GROSS.AMT.TRD>          = '100.10'
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.BR.MISC.FEE>               = '1.00'
-    R.SCB.PVB.EQD.GROUP.TODAY<SCB.EQD.ST.SEC.TRADE.ID.NOT.INCLUDED> = ''
-    UTF.setRecord("F.SCB.PVB.EQD.GROUP.TODAY", GRP.ID, R.SCB.PVB.EQD.GROUP.TODAY)
-
-*   -- Security transfer record
-    R.SECURITY.TRANSFER = ''
-    R.SECURITY.TRANSFER<SC.STR.NO.NOMINAL>       = '1000'
-    R.SECURITY.TRANSFER<SC.STR.BR.NET.AMT>       = '100.10'
-    R.SECURITY.TRANSFER<SC.STR.TRANSACTION.TYPE> = 'SEL'
-    R.SECURITY.TRANSFER<SC.STR.SECURITY.CCY>     = 'SGD'
-    R.SECURITY.TRANSFER<SC.STR.DELIVERY.KEY>     = ''
-    R.SECURITY.TRANSFER<SC.STR.LOCAL.REF,1>      = '1001234'
-    UTF.setRecord("F.SECURITY.TRANSFER", 'SECTSC2601293104', R.SECURITY.TRANSFER)
-
-*   -- Sec trade record
-    R.SEC.TRADE = ''
-    R.SEC.TRADE<SC.SBS.CUST.TRANS.CODE> = 'CUST001'
-    R.SEC.TRADE<SC.SBS.SECURITY.CODE>   = 'SEC001'
-    UTF.setRecord("F.SEC.TRADE", 'ST12345', R.SEC.TRADE)
-
-*   -- Security master record
-    R.SECURITY.MASTER = ''
-    R.SECURITY.MASTER<SC.SCM.I.S.I.N.> = 'SG1234567890'
-    UTF.setRecord("F.SECURITY.MASTER", 'SEC001', R.SECURITY.MASTER)
-
-*   -- Stock exchange record (code taken from position 6 of GRP.ID, i.e. '6010')
-    R.STOCK.EXCHANGE = ''
-    R.STOCK.EXCHANGE<SC.STE.DESCRIPTION,1> = 'SINGAPORE EXCHANGE'
-    UTF.setRecord("F.STOCK.EXCHANGE", '6010', R.STOCK.EXCHANGE)
-
-RETURN
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
 END
