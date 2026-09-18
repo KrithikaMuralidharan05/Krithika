@@ -1,0 +1,28 @@
+Acceptance Criteria
+Identification of HK ETF Trades
+
+Given a trade is captured in the system,
+When the trade has stock.exchange = 104 And sub asset type = 118,
+Then the system should classify it as an HK ETF trade for fee determination purposes. Stamp Duty Fee Exception
+
+Given a trade is identified as an HK ETF trade (stock.exchange = 104 and sub asset type = 118),
+When fees are calculated for the trade, Then stamp duty fee must not be applied and the stamp duty fee amount must be 0.
+No Impact on Other Trades
+
+Given a trade does not meet both conditions (stock.exchange = 104 and sub asset type = 118),
+When fees are calculated, Then stamp duty fees should be charged as per existing rules with no change in current behaviour.
+
+2.Identification of LSE IE trades
+
+Given a trade is captured in the system,
+When the trade has stock.exchange = 361
+And company domicile = IE,
+Then the system should classify it as an LSE IE trade for fee determination purposes.
+Stamp Duty Fee Exception
+
+Given a trade is identified as an LSE IE trade (stock.exchange = 361 and company domicile = IE),
+When fees are calculated for the trade, Then stamp duty fee must not be applied
+And the stamp duty fee amount must be 0. No Impact on Other Trades
+
+Given a trade does not meet both conditions (stock.exchange = 361 and company domicile = IE),
+When fees are calculated, then stamp duty fees should be charged as per existing rules with no change in current behaviour.
