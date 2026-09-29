@@ -1,0 +1,207 @@
+TESTCASE B.SCB.STMP.DTY.EXEP
+*-----------------------------------------------------------------------------
+* @author     :  Raghavan K
+*-----------------------------------------------------------------------------
+*
+*   Modification History :
+*
+*   [8220461] - [18th Sep 2026] - [15990649] - Worker for the Stamp Duty exemption extract batch.
+*
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.SECURITY.MASTER
+
+    UTF.setTarget("B.SCB.STMP.DTY.EXEP")   ;* Name of the Target routine for which test is done
+    UTF.setDescription("Batch worker - clears LWM.GSD to 0 on SECURITY.MASTER records that qualify for the stamp duty exemption")
+    GOSUB runtest1      ;* Single security matching the first SELECT (SEHK/HKSCC style: STOCK.EXCHANGE 104 + SUB.ASSET.TYPE 118)
+    GOSUB runtest2      ;* Single security matching the second SELECT (STOCK.EXCHANGE 361 + COMPANY.DOMICILE IE)
+    GOSUB runtest3      ;* Multiple matching securities across both SELECTs in the same run
+    GOSUB runtest4      ;* Security fails the SUB.ASSET.TYPE criterion on the first SELECT - left untouched
+    GOSUB runtest5      ;* Security fails the COMPANY.DOMICILE criterion on the second SELECT - left untouched
+    GOSUB runtest6      ;* Neither SELECT returns any records - routine completes without error
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> Security qualifies under the first SELECT (STOCK.EXCHANGE EQ 104 AND
+            SUB.ASSET.TYPE EQ 118 AND LWM.GSD NE 0) -> LWM.GSD is reset to 0 and the record
+            is written back via F.LIVE.WRITE</desc>
+
+runtest1:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs        ;* MULTI.GET.LOC.REF stub required for all test cases
+* set data for this test
+    R.SM = ''
+    R.SM<SC.SCM.STOCK.EXCHANGE> = '104'
+    R.SM<SC.SCM.SUB.ASSET.TYPE> = '118'
+    R.SM<SC.SCM.LOCAL.REF,POS.LWM.GSD> = '1'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0001", R.SM)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Security matching STOCK.EXCHANGE 104 + SUB.ASSET.TYPE 118 has LWM.GSD reset to 0")
+    SM.REC = UTF.getRecord("F.SECURITY.MASTER", "SEC0001")
+* doAssertions for this testcase
+    UTF.assertEquals(SM.REC<SC.SCM.LOCAL.REF,POS.LWM.GSD>, "0")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> Security qualifies under the second SELECT (STOCK.EXCHANGE EQ 361 AND
+            COMPANY.DOMICILE EQ IE AND LWM.GSD NE 0) -> LWM.GSD is reset to 0</desc>
+
+runtest2:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    R.SM = ''
+    R.SM<SC.SCM.STOCK.EXCHANGE> = '361'
+    R.SM<SC.SCM.COMPANY.DOMICILE> = 'IE'
+    R.SM<SC.SCM.LOCAL.REF,POS.LWM.GSD> = '1'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0002", R.SM)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Security matching STOCK.EXCHANGE 361 + COMPANY.DOMICILE IE has LWM.GSD reset to 0")
+    SM.REC = UTF.getRecord("F.SECURITY.MASTER", "SEC0002")
+* doAssertions for this testcase
+    UTF.assertEquals(SM.REC<SC.SCM.LOCAL.REF,POS.LWM.GSD>, "0")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase3>
+*** <desc> Several securities qualify across both SELECT statements in the same batch run -
+            exercises the LOOP/REMOVE...SETTING loop processing more than one id, and
+            confirms both SELECT.STMT invocations run within a single call</desc>
+
+runtest3:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    R.SM1 = ''
+    R.SM1<SC.SCM.STOCK.EXCHANGE> = '104'
+    R.SM1<SC.SCM.SUB.ASSET.TYPE> = '118'
+    R.SM1<SC.SCM.LOCAL.REF,POS.LWM.GSD> = '2'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0003", R.SM1)
+
+    R.SM2 = ''
+    R.SM2<SC.SCM.STOCK.EXCHANGE> = '104'
+    R.SM2<SC.SCM.SUB.ASSET.TYPE> = '118'
+    R.SM2<SC.SCM.LOCAL.REF,POS.LWM.GSD> = '3'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0004", R.SM2)
+
+    R.SM3 = ''
+    R.SM3<SC.SCM.STOCK.EXCHANGE> = '361'
+    R.SM3<SC.SCM.COMPANY.DOMICILE> = 'IE'
+    R.SM3<SC.SCM.LOCAL.REF,POS.LWM.GSD> = '4'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0005", R.SM3)
+* set stubs for this test
+* addParameter
+    UTF.runTest("All three qualifying securities across both SELECTs are reset to 0")
+    SM1.REC = UTF.getRecord("F.SECURITY.MASTER", "SEC0003")
+    SM2.REC = UTF.getRecord("F.SECURITY.MASTER", "SEC0004")
+    SM3.REC = UTF.getRecord("F.SECURITY.MASTER", "SEC0005")
+* doAssertions for this testcase
+    UTF.assertEquals(SM1.REC<SC.SCM.LOCAL.REF,POS.LWM.GSD>, "0")
+    UTF.assertEquals(SM2.REC<SC.SCM.LOCAL.REF,POS.LWM.GSD>, "0")
+    UTF.assertEquals(SM3.REC<SC.SCM.LOCAL.REF,POS.LWM.GSD>, "0")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase4>
+*** <desc> Security is on STOCK.EXCHANGE 104 but fails the SUB.ASSET.TYPE EQ 118 criterion
+            on the first SELECT -> not returned by EB.READLIST, LWM.GSD is left untouched</desc>
+
+runtest4:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    R.SM = ''
+    R.SM<SC.SCM.STOCK.EXCHANGE> = '104'
+    R.SM<SC.SCM.SUB.ASSET.TYPE> = '999'    ;* deliberately does not match 118
+    R.SM<SC.SCM.LOCAL.REF,POS.LWM.GSD> = '7'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0006", R.SM)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Security failing the SUB.ASSET.TYPE criterion is left untouched")
+    SM.REC = UTF.getRecord("F.SECURITY.MASTER", "SEC0006")
+* doAssertions for this testcase
+    UTF.assertEquals(SM.REC<SC.SCM.LOCAL.REF,POS.LWM.GSD>, "7")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase5>
+*** <desc> Security is on STOCK.EXCHANGE 361 but fails the COMPANY.DOMICILE EQ IE criterion
+            on the second SELECT -> not returned by EB.READLIST, LWM.GSD is left untouched</desc>
+
+runtest5:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    R.SM = ''
+    R.SM<SC.SCM.STOCK.EXCHANGE> = '361'
+    R.SM<SC.SCM.COMPANY.DOMICILE> = 'US'   ;* deliberately does not match IE
+    R.SM<SC.SCM.LOCAL.REF,POS.LWM.GSD> = '6'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0007", R.SM)
+* set stubs for this test
+* addParameter
+    UTF.runTest("Security failing the COMPANY.DOMICILE criterion is left untouched")
+    SM.REC = UTF.getRecord("F.SECURITY.MASTER", "SEC0007")
+* doAssertions for this testcase
+    UTF.assertEquals(SM.REC<SC.SCM.LOCAL.REF,POS.LWM.GSD>, "6")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase6>
+*** <desc> No SECURITY.MASTER records qualify for either SELECT - both SELECT.STMT calls
+            return an empty list and the routine completes without error</desc>
+
+runtest6:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    R.SM = ''
+    R.SM<SC.SCM.STOCK.EXCHANGE> = '206'    ;* neither 104 nor 361
+    R.SM<SC.SCM.LOCAL.REF,POS.LWM.GSD> = '9'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0008", R.SM)
+* set stubs for this test
+* addParameter
+    UTF.runTest("No qualifying securities - routine completes cleanly")
+    SM.REC = UTF.getRecord("F.SECURITY.MASTER", "SEC0008")
+* doAssertions for this testcase
+    UTF.assertEquals(SM.REC<SC.SCM.LOCAL.REF,POS.LWM.GSD>, "9")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Stubs common for all test cases>
+*** <desc> OPEN.FILES calls MULTI.GET.LOC.REF once to resolve the LWM.GSD local ref position
+            on SECURITY.MASTER - stub it to hand back position 1, matching POS.LWM.GSD used
+            to build each test's mock record above.</desc>
+
+setSharedStubs:
+    POS.LWM.GSD = '1'
+
+    STUB.LOC = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB.LOC, UTF.any(), UTF.same())    ;* LOC.REF.APP ('SECURITY.MASTER')
+    UTF.addStubParam(STUB.LOC, UTF.any(), UTF.same())    ;* LOC.REF.FLD ('LWM.GSD')
+    UTF.addStubParam(STUB.LOC, UTF.any(), POS.LWM.GSD)   ;* LOC.REF.POS output -> position 1
+    UTF.setRepeatable(STUB.LOC)
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+END
