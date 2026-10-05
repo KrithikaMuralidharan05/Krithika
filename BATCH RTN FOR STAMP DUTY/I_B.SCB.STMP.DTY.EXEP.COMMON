@@ -1,0 +1,12 @@
+*-----------------------------------------------------------------------------
+* I_B.SCB.STMP.DTY.EXEP.COMMON
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* <date> - <ADO ref> - <author> - Shared COMMON for the multi-threaded B.SCB.STMP.DTY.EXEP
+*          batch: B.SCB.STMP.DTY.EXEP.LOAD resolves these once before threading starts,
+*          B.SCB.STMP.DTY.EXEP (the worker) reuses them on every threaded call instead of
+*          re-opening the file / re-resolving the local ref position per id.
+*-----------------------------------------------------------------------------
+
+    COMMON /B.SCB.STMP.DTY.EXEP.COMMON/ FN.SECURITY.MASTER, F.SECURITY.MASTER, Y.LWM.GSD.POS
