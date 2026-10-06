@@ -1,0 +1,15 @@
+*-----------------------------------------------------------------------------
+* I_B.SCB.SM.STMP.DTY.UPD.COMMON
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* <1st Oct 2026> - <15990649> - <Krithika> - Shared COMMON for the multi-threaded B.SCB.STMP.DTY.EXEP
+*          batch: B.SCB.SM.STMP.DTY.UPD.LOAD resolves these once before threading starts,
+*          B.SCB.STMP.DTY.EXEP (the worker) reuses them on every threaded call instead of
+*          re-opening the file / re-resolving the local ref position per id.
+*-----------------------------------------------------------------------------
+
+COM /B.SCB.SM.STMP.DTY.UPD/FN.SECURITY.MASTER,
+F.SECURITY.MASTER,
+Y.LWM.GSD.POS,
+SEL.LIST
