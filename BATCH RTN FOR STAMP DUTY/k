@@ -1,15 +1,17 @@
-Instead of this:
+    SEL.LIST = ''
 
- 
+    SEL.CMD1 = 'SELECT ':FN.SECURITY.MASTER:' WITH STOCK.EXCHANGE EQ "104" AND SUB.ASSET.TYPE EQ "118" AND LWM.GSD NE 0'
+    SEL.CMD2 = 'SELECT ':FN.SECURITY.MASTER:' WITH STOCK.EXCHANGE EQ "361" AND COMPANY.DOMICILE EQ "IE" AND LWM.GSD NE 0'
 
-Can we try this?
+    CALL EB.READLIST(SEL.CMD1,SEL.LIST1,'',SEL.CNT1,SEL.ERR)
+    CALL EB.READLIST(SEL.CMD2,SEL.LIST2,'',SEL.CNT2,SEL.ERR)
 
- 
+    IF SEL.LIST1 THEN SEL.LIST<-1> = SEL.LIST1
+    IF SEL.LIST2 THEN SEL.LIST<-1> = SEL.LIST2
 
-Don’t forget to initialize SEL.LIST first.
+    CALL OCOMO("SEL.LIST: ":SEL.LIST)
 
-Y.LWD.GSD is not used anywhere so is this required?
+    CALL BATCH.BUILD.LIST('', SEL.LIST)
+RETURN
 
- 
-
-Also, call OCOMO after F.LIVE.WRITE to capture which security master ID is updated.
+END
