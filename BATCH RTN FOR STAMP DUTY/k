@@ -1,0 +1,15 @@
+Instead of this:
+
+ 
+
+Can we try this?
+
+ 
+
+Don’t forget to initialize SEL.LIST first.
+
+Y.LWD.GSD is not used anywhere so is this required?
+
+ 
+
+Also, call OCOMO after F.LIVE.WRITE to capture which security master ID is updated.
