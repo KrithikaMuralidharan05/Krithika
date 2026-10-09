@@ -1,0 +1,93 @@
+TESTCASE B.SCB.SM.STMP.DTY.UPD
+*-----------------------------------------------------------------------------
+* @author     :  Raghavan K
+*-----------------------------------------------------------------------------
+*
+*   Modification History :
+*
+*   <date> - <ADO ref> - <author> - Worker step of the multi-threaded Stamp Duty exemption batch.
+*
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.SECURITY.MASTER
+    $INSERT I_B.SCB.SM.STMP.DTY.UPD.COMMON
+
+    UTF.setTarget("B.SCB.SM.STMP.DTY.UPD")   ;* Name of the Target routine for which test is done
+    UTF.setDescription("Worker - zeroes LWM.GSD on the one SECURITY.MASTER id it is called with")
+    GOSUB runtest1      ;* Normal case - COMMON already populated by LOAD, id is processed
+    GOSUB runtest2      ;* Blank Y.SECURITY.CODE - IF Y.SECURITY.CODE THEN is skipped entirely
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> COMMON already carries FN.SECURITY.MASTER/F.SECURITY.MASTER/Y.LWM.GSD.POS, as it
+            would after B.SCB.SM.STMP.DTY.UPD.LOAD has run - the worker reads the record,
+            zeroes LWM.GSD and writes it back via the stubbed F.LIVE.WRITE</desc>
+
+runtest1:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs        ;* F.LIVE.WRITE stub required for all test cases
+* set data for this test
+    FN.SECURITY.MASTER = 'F.SECURITY.MASTER'
+    F.SECURITY.MASTER = ''
+    Y.LWM.GSD.POS = '1'
+
+    R.SM = ''
+    R.SM<SC.SCM.STOCK.EXCHANGE> = '104'
+    R.SM<SC.SCM.SUB.ASSET.TYPE> = '118'
+    R.SM<SC.SCM.LOCAL.REF,1> = '1'
+    UTF.setRecord("F.SECURITY.MASTER", "SEC0001", R.SM)
+* set stubs for this test
+* addParameter
+    UTF.addParam("SEC0001")
+    UTF.runTest("Worker processes the single id it is called with")
+* doAssertions for this testcase
+    UTF.assertTrue("TRUE")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> Blank Y.SECURITY.CODE - IF Y.SECURITY.CODE THEN is never entered, so no F.READ or
+            F.LIVE.WRITE is attempted and the routine returns cleanly</desc>
+
+runtest2:
+
+    UTF.reset() ;* Reset all
+    GOSUB setSharedStubs
+* set data for this test
+    FN.SECURITY.MASTER = 'F.SECURITY.MASTER'
+    F.SECURITY.MASTER = ''
+    Y.LWM.GSD.POS = '1'
+* set stubs for this test
+* addParameter
+    UTF.addParam("")
+    UTF.runTest("Blank id is a clean no-op")
+* doAssertions for this testcase
+    UTF.assertTrue("TRUE")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Stubs common for all test cases>
+*** <desc> F.LIVE.WRITE is stubbed as a pass-through no-op, same as in the earlier
+            single-threaded version of this worker - it does not go through the mock file
+            store the way F.READ does, so assertions here check the routine runs cleanly
+            rather than re-reading the record afterwards.</desc>
+
+setSharedStubs:
+    STUB.WRT = UTF.addStub("F.LIVE.WRITE")
+    UTF.addStubParam(STUB.WRT, UTF.any(), UTF.same())    ;* FN.SECURITY.MASTER
+    UTF.addStubParam(STUB.WRT, UTF.any(), UTF.same())    ;* Y.SECURITY.CODE
+    UTF.addStubParam(STUB.WRT, UTF.any(), UTF.same())    ;* R.SECURITY.MASTER (the record being written)
+    UTF.setRepeatable(STUB.WRT)
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+END

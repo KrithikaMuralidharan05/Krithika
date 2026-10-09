@@ -1,0 +1,81 @@
+TESTCASE B.SCB.SM.STMP.DTY.UPD.LOAD
+*-----------------------------------------------------------------------------
+* @author     :  Raghavan K
+*-----------------------------------------------------------------------------
+*
+*   Modification History :
+*
+*   <date> - <ADO ref> - <author> - LOAD step of the multi-threaded Stamp Duty exemption batch.
+*
+*-----------------------------------------------------------------------------
+*** <region = Header>
+*** <desc> </desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.SECURITY.MASTER
+    $INSERT I_B.SCB.SM.STMP.DTY.UPD.COMMON
+
+    UTF.setTarget("B.SCB.SM.STMP.DTY.UPD.LOAD")   ;* Name of the Target routine for which test is done
+    UTF.setDescription("LOAD step - opens SECURITY.MASTER and resolves the LWM.GSD local ref position into COMMON")
+    GOSUB runtest1      ;* MULTI.GET.LOC.REF resolves position 1 - confirms FN.SECURITY.MASTER and Y.LWM.GSD.POS land in COMMON
+    GOSUB runtest2      ;* MULTI.GET.LOC.REF resolves a different position - confirms the <1,1> extraction isn't hardcoded
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase1>
+*** <desc> MULTI.GET.LOC.REF resolves the LWM.GSD local ref to position 1 - since
+            FN.SECURITY.MASTER/F.SECURITY.MASTER/Y.LWM.GSD.POS are all declared in the shared
+            COMMON insert that this test script also carries, they can be read directly after
+            UTF.runTest to confirm LOAD actually populated them</desc>
+
+runtest1:
+
+    UTF.reset() ;* Reset all
+* set data for this test
+    FN.SECURITY.MASTER = ''
+    F.SECURITY.MASTER = ''
+    Y.LWM.GSD.POS = ''
+* set stubs for this test
+    STUB.LOC = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB.LOC, UTF.any(), UTF.same())    ;* LOC.REF.APP ('SECURITY.MASTER')
+    UTF.addStubParam(STUB.LOC, UTF.any(), UTF.same())    ;* LOC.REF.FLD ('LWM.GSD')
+    UTF.addStubParam(STUB.LOC, UTF.any(), '1')            ;* LOC.REF.POS output -> position 1
+    UTF.setRepeatable(STUB.LOC)
+* addParameter
+    UTF.runTest("LOAD resolves FN.SECURITY.MASTER and Y.LWM.GSD.POS into COMMON")
+* doAssertions for this testcase
+    UTF.assertEquals(FN.SECURITY.MASTER, "F.SECURITY.MASTER")
+    UTF.assertEquals(Y.LWM.GSD.POS, "1")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= testcase2>
+*** <desc> MULTI.GET.LOC.REF resolves the local ref to a different position - confirms
+            Y.LWM.GSD.POS = Y.LOC.REF.POS<1,1> picks up whatever position is returned rather
+            than always ending up as 1 by coincidence</desc>
+
+runtest2:
+
+    UTF.reset() ;* Reset all
+* set data for this test
+    FN.SECURITY.MASTER = ''
+    F.SECURITY.MASTER = ''
+    Y.LWM.GSD.POS = ''
+* set stubs for this test
+    STUB.LOC = UTF.addStub("MULTI.GET.LOC.REF")
+    UTF.addStubParam(STUB.LOC, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.LOC, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.LOC, UTF.any(), '7')            ;* LOC.REF.POS output -> position 7
+    UTF.setRepeatable(STUB.LOC)
+* addParameter
+    UTF.runTest("LOAD picks up whatever position MULTI.GET.LOC.REF returns")
+* doAssertions for this testcase
+    UTF.assertEquals(FN.SECURITY.MASTER, "F.SECURITY.MASTER")
+    UTF.assertEquals(Y.LWM.GSD.POS, "7")
+
+RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+END
