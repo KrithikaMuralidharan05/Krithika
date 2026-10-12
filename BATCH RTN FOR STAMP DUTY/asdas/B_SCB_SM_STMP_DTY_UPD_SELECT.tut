@@ -17,56 +17,51 @@ TESTCASE B.SCB.SM.STMP.DTY.UPD.SELECT
 
     UTF.setTarget("B.SCB.SM.STMP.DTY.UPD.SELECT")   ;* Name of the Target routine for which test is done
     UTF.setDescription("SELECT step - merges both SELECTs' id lists and hands them to BATCH.BUILD.LIST")
-    GOSUB runtest1      ;* Both SELECTs return ids - merged list carries both
-    GOSUB runtest2      ;* Only the first SELECT returns ids - SEL.LIST2 is blank, IF SEL.LIST2 THEN is skipped
-    GOSUB runtest3      ;* Only the second SELECT returns ids - SEL.LIST1 is blank, IF SEL.LIST1 THEN is skipped
-    GOSUB runtest4      ;* Neither SELECT returns anything - SEL.LIST stays '', BATCH.BUILD.LIST still called cleanly
+    GOSUB runtest1      ;* EB.READLIST returns ids on both calls - both SEL.LIST<-1>= appends fire
+    GOSUB runtest2      ;* EB.READLIST returns an empty list on both calls - SEL.LIST stays ''
 *
     RETURN
 *** </region>
 *-----------------------------------------------------------------------------
 *** <region name= testcase1>
-*** <desc> Both EB.READLIST calls return ids - SEL.LIST<-1>=SEL.LIST1 and SEL.LIST<-1>=SEL.LIST2
-            both fire, so the list BATCH.BUILD.LIST receives carries ids from both SELECTs</desc>
+*** <desc> EB.READLIST is stubbed generically (UTF.any() on SEL.CMD) since this framework's
+            UTF.addStubParam does not accept a long literal match string containing embedded
+            quote characters - the same stub response is returned for both the STOCK.EXCHANGE
+            104 and the STOCK.EXCHANGE 361 SELECT, so this exercises both
+            IF SEL.LIST1 THEN SEL.LIST<-1>=SEL.LIST1 and IF SEL.LIST2 THEN SEL.LIST<-1>=SEL.LIST2
+            firing, confirming the merge appends on every non-blank result rather than
+            confirming which literal SELECT produced it</desc>
 
 runtest1:
 
     UTF.reset() ;* Reset all
-    GOSUB setSharedStubs        ;* OPF stub required for all test cases (SELECT opens its own file handle)
+    GOSUB setSharedStubs        ;* resets FN.SECURITY.MASTER/F.SECURITY.MASTER for every test case
 * set data for this test
 * set stubs for this test
-    STUB.SEL1 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL1, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "104" AND SUB.ASSET.TYPE EQ "118" AND LWM.GSD NE 0', UTF.same())
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "SEC0001")
-    UTF.addStubParam(STUB.SEL1, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "1")
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "")
-    UTF.setRepeatable(STUB.SEL1)
-
-    STUB.SEL2 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL2, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "361" AND COMPANY.DOMICILE EQ "IE" AND LWM.GSD NE 0', UTF.same())
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "SEC0002")
-    UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "1")
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "")
-    UTF.setRepeatable(STUB.SEL2)
+    STUB.SEL = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(STUB.SEL, UTF.any(), UTF.same())     ;* SEL.CMD (in only)
+    UTF.addStubParam(STUB.SEL, UTF.any(), "SEC0001")      ;* SEL.LIST out
+    UTF.addStubParam(STUB.SEL, UTF.any(), UTF.same())     ;* '' passthrough
+    UTF.addStubParam(STUB.SEL, UTF.any(), "1")            ;* NO.OF.RECS out
+    UTF.addStubParam(STUB.SEL, UTF.any(), "")             ;* SEL.ERR out
+    UTF.setRepeatable(STUB.SEL)     ;* SELECT.PARA calls EB.READLIST twice per run - once per SELECT
 
     STUB.BLD = UTF.addStub("BATCH.BUILD.LIST")
     UTF.addStubParam(STUB.BLD, UTF.any(), UTF.same())
     UTF.addStubParam(STUB.BLD, UTF.any(), UTF.same())
     UTF.setRepeatable(STUB.BLD)
 * addParameter
-    UTF.runTest("Both SELECTs returning ids are merged into one list")
+    UTF.runTest("Both EB.READLIST calls returning ids triggers both merge appends")
 * doAssertions for this testcase
-    UTF.assertEquals(SEL.LIST, "SEC0001":@FM:"SEC0002")
+    UTF.assertEquals(SEL.LIST, "SEC0001":@FM:"SEC0001")
 
 RETURN
 *** </region>
 *-----------------------------------------------------------------------------
 *** <region name= testcase2>
-*** <desc> Only the first SELECT (STOCK.EXCHANGE 104 + SUB.ASSET.TYPE 118) returns ids - the
-            second EB.READLIST call returns blank, so IF SEL.LIST2 THEN is never taken and the
-            merged list is exactly SEL.LIST1</desc>
+*** <desc> EB.READLIST returns an empty list on both calls - neither IF SEL.LIST1 THEN nor
+            IF SEL.LIST2 THEN is taken, so SEL.LIST stays at its initialised '' value and
+            BATCH.BUILD.LIST is still called cleanly with an empty list</desc>
 
 runtest2:
 
@@ -74,98 +69,13 @@ runtest2:
     GOSUB setSharedStubs
 * set data for this test
 * set stubs for this test
-    STUB.SEL1 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL1, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "104" AND SUB.ASSET.TYPE EQ "118" AND LWM.GSD NE 0', UTF.same())
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "SEC0003":@FM:"SEC0004")
-    UTF.addStubParam(STUB.SEL1, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "2")
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "")
-    UTF.setRepeatable(STUB.SEL1)
-
-    STUB.SEL2 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL2, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "361" AND COMPANY.DOMICILE EQ "IE" AND LWM.GSD NE 0', UTF.same())
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "")
-    UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "0")
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "")
-    UTF.setRepeatable(STUB.SEL2)
-
-    STUB.BLD = UTF.addStub("BATCH.BUILD.LIST")
-    UTF.addStubParam(STUB.BLD, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.BLD, UTF.any(), UTF.same())
-    UTF.setRepeatable(STUB.BLD)
-* addParameter
-    UTF.runTest("Only the first SELECT returning ids still produces the right list")
-* doAssertions for this testcase
-    UTF.assertEquals(SEL.LIST, "SEC0003":@FM:"SEC0004")
-
-RETURN
-*** </region>
-*-----------------------------------------------------------------------------
-*** <region name= testcase3>
-*** <desc> Only the second SELECT (STOCK.EXCHANGE 361 + COMPANY.DOMICILE IE) returns ids - the
-            first EB.READLIST call returns blank, so IF SEL.LIST1 THEN is never taken and the
-            merged list is exactly SEL.LIST2</desc>
-
-runtest3:
-
-    UTF.reset() ;* Reset all
-    GOSUB setSharedStubs
-* set data for this test
-* set stubs for this test
-    STUB.SEL1 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL1, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "104" AND SUB.ASSET.TYPE EQ "118" AND LWM.GSD NE 0', UTF.same())
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "")
-    UTF.addStubParam(STUB.SEL1, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "0")
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "")
-    UTF.setRepeatable(STUB.SEL1)
-
-    STUB.SEL2 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL2, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "361" AND COMPANY.DOMICILE EQ "IE" AND LWM.GSD NE 0', UTF.same())
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "SEC0005")
-    UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "1")
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "")
-    UTF.setRepeatable(STUB.SEL2)
-
-    STUB.BLD = UTF.addStub("BATCH.BUILD.LIST")
-    UTF.addStubParam(STUB.BLD, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.BLD, UTF.any(), UTF.same())
-    UTF.setRepeatable(STUB.BLD)
-* addParameter
-    UTF.runTest("Only the second SELECT returning ids still produces the right list")
-* doAssertions for this testcase
-    UTF.assertEquals(SEL.LIST, "SEC0005")
-
-RETURN
-*** </region>
-*-----------------------------------------------------------------------------
-*** <region name= testcase4>
-*** <desc> Neither SELECT returns anything - SEL.LIST stays at its initialised '' value and
-            BATCH.BUILD.LIST is still called cleanly with an empty list</desc>
-
-runtest4:
-
-    UTF.reset() ;* Reset all
-    GOSUB setSharedStubs
-* set data for this test
-* set stubs for this test
-    STUB.SEL1 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL1, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "104" AND SUB.ASSET.TYPE EQ "118" AND LWM.GSD NE 0', UTF.same())
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "")
-    UTF.addStubParam(STUB.SEL1, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "0")
-    UTF.addStubParam(STUB.SEL1, UTF.any(), "")
-    UTF.setRepeatable(STUB.SEL1)
-
-    STUB.SEL2 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL2, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "361" AND COMPANY.DOMICILE EQ "IE" AND LWM.GSD NE 0', UTF.same())
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "")
-    UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "0")
-    UTF.addStubParam(STUB.SEL2, UTF.any(), "")
-    UTF.setRepeatable(STUB.SEL2)
+    STUB.SEL = UTF.addStub("EB.READLIST")
+    UTF.addStubParam(STUB.SEL, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.SEL, UTF.any(), "")
+    UTF.addStubParam(STUB.SEL, UTF.any(), UTF.same())
+    UTF.addStubParam(STUB.SEL, UTF.any(), "0")
+    UTF.addStubParam(STUB.SEL, UTF.any(), "")
+    UTF.setRepeatable(STUB.SEL)
 
     STUB.BLD = UTF.addStub("BATCH.BUILD.LIST")
     UTF.addStubParam(STUB.BLD, UTF.any(), UTF.same())
@@ -184,11 +94,16 @@ RETURN
             F.SECURITY.MASTER itself rather than relying on COMMON - no stub is needed for
             CALL OPF itself (it is a plain file open, like F.READ, and works against the mock
             file store directly), this just resets FN.SECURITY.MASTER/F.SECURITY.MASTER so
-            each test starts from the same blank state.</desc>
+            each test starts from the same blank state. CALL OCOMO runs unconditionally after
+            the merge (logging SEL.LIST before BATCH.BUILD.LIST) and needs a no-op stub too.</desc>
 
 setSharedStubs:
     FN.SECURITY.MASTER = ''
     F.SECURITY.MASTER = ''
+
+    STUB.OCM = UTF.addStub("OCOMO")
+    UTF.addStubParam(STUB.OCM, UTF.any(), UTF.same())    ;* message text (in only)
+    UTF.setRepeatable(STUB.OCM)
 
     RETURN
 *** </region>
