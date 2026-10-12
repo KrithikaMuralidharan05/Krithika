@@ -1,0 +1,4 @@
+ Error : (line 39) B.SCB.SM.STMP.DTY.UPD.SELECT, unexpected token: UTF.addStubParam
+     Error : (line 47) B.SCB.SM.STMP.DTY.UPD.SELECT, unexpected token: UTF.addStubParam
+     Error : (line 77) B.SCB.SM.STMP.DTY.UPD.SELECT, unexpected token: UTF.addStubParam
+     Error : (line 77) B.SCB.SM.STMP.DTY.UPD.SELECT, expecting '\', found '<EOF>'
