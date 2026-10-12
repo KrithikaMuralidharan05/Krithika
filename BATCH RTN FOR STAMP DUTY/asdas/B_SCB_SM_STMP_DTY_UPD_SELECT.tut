@@ -36,7 +36,7 @@ runtest1:
 * set data for this test
 * set stubs for this test
     STUB.SEL1 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL1, "SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ \"104\" AND SUB.ASSET.TYPE EQ \"118\" AND LWM.GSD NE 0", UTF.same())
+    UTF.addStubParam(STUB.SEL1, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "104" AND SUB.ASSET.TYPE EQ "118" AND LWM.GSD NE 0', UTF.same())
     UTF.addStubParam(STUB.SEL1, UTF.any(), "SEC0001")
     UTF.addStubParam(STUB.SEL1, UTF.any(), UTF.same())
     UTF.addStubParam(STUB.SEL1, UTF.any(), "1")
@@ -44,7 +44,7 @@ runtest1:
     UTF.setRepeatable(STUB.SEL1)
 
     STUB.SEL2 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL2, "SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ \"361\" AND COMPANY.DOMICILE EQ \"IE\" AND LWM.GSD NE 0", UTF.same())
+    UTF.addStubParam(STUB.SEL2, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "361" AND COMPANY.DOMICILE EQ "IE" AND LWM.GSD NE 0', UTF.same())
     UTF.addStubParam(STUB.SEL2, UTF.any(), "SEC0002")
     UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())
     UTF.addStubParam(STUB.SEL2, UTF.any(), "1")
@@ -75,7 +75,7 @@ runtest2:
 * set data for this test
 * set stubs for this test
     STUB.SEL1 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL1, "SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ \"104\" AND SUB.ASSET.TYPE EQ \"118\" AND LWM.GSD NE 0", UTF.same())
+    UTF.addStubParam(STUB.SEL1, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "104" AND SUB.ASSET.TYPE EQ "118" AND LWM.GSD NE 0', UTF.same())
     UTF.addStubParam(STUB.SEL1, UTF.any(), "SEC0003":@FM:"SEC0004")
     UTF.addStubParam(STUB.SEL1, UTF.any(), UTF.same())
     UTF.addStubParam(STUB.SEL1, UTF.any(), "2")
@@ -83,7 +83,7 @@ runtest2:
     UTF.setRepeatable(STUB.SEL1)
 
     STUB.SEL2 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL2, "SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ \"361\" AND COMPANY.DOMICILE EQ \"IE\" AND LWM.GSD NE 0", UTF.same())
+    UTF.addStubParam(STUB.SEL2, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "361" AND COMPANY.DOMICILE EQ "IE" AND LWM.GSD NE 0', UTF.same())
     UTF.addStubParam(STUB.SEL2, UTF.any(), "")
     UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())
     UTF.addStubParam(STUB.SEL2, UTF.any(), "0")
@@ -114,7 +114,7 @@ runtest3:
 * set data for this test
 * set stubs for this test
     STUB.SEL1 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL1, "SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ \"104\" AND SUB.ASSET.TYPE EQ \"118\" AND LWM.GSD NE 0", UTF.same())
+    UTF.addStubParam(STUB.SEL1, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "104" AND SUB.ASSET.TYPE EQ "118" AND LWM.GSD NE 0', UTF.same())
     UTF.addStubParam(STUB.SEL1, UTF.any(), "")
     UTF.addStubParam(STUB.SEL1, UTF.any(), UTF.same())
     UTF.addStubParam(STUB.SEL1, UTF.any(), "0")
@@ -122,7 +122,7 @@ runtest3:
     UTF.setRepeatable(STUB.SEL1)
 
     STUB.SEL2 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL2, "SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ \"361\" AND COMPANY.DOMICILE EQ \"IE\" AND LWM.GSD NE 0", UTF.same())
+    UTF.addStubParam(STUB.SEL2, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "361" AND COMPANY.DOMICILE EQ "IE" AND LWM.GSD NE 0', UTF.same())
     UTF.addStubParam(STUB.SEL2, UTF.any(), "SEC0005")
     UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())
     UTF.addStubParam(STUB.SEL2, UTF.any(), "1")
@@ -152,7 +152,7 @@ runtest4:
 * set data for this test
 * set stubs for this test
     STUB.SEL1 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL1, "SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ \"104\" AND SUB.ASSET.TYPE EQ \"118\" AND LWM.GSD NE 0", UTF.same())
+    UTF.addStubParam(STUB.SEL1, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "104" AND SUB.ASSET.TYPE EQ "118" AND LWM.GSD NE 0', UTF.same())
     UTF.addStubParam(STUB.SEL1, UTF.any(), "")
     UTF.addStubParam(STUB.SEL1, UTF.any(), UTF.same())
     UTF.addStubParam(STUB.SEL1, UTF.any(), "0")
@@ -160,7 +160,7 @@ runtest4:
     UTF.setRepeatable(STUB.SEL1)
 
     STUB.SEL2 = UTF.addStub("EB.READLIST")
-    UTF.addStubParam(STUB.SEL2, "SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ \"361\" AND COMPANY.DOMICILE EQ \"IE\" AND LWM.GSD NE 0", UTF.same())
+    UTF.addStubParam(STUB.SEL2, 'SELECT F.SECURITY.MASTER WITH STOCK.EXCHANGE EQ "361" AND COMPANY.DOMICILE EQ "IE" AND LWM.GSD NE 0', UTF.same())
     UTF.addStubParam(STUB.SEL2, UTF.any(), "")
     UTF.addStubParam(STUB.SEL2, UTF.any(), UTF.same())
     UTF.addStubParam(STUB.SEL2, UTF.any(), "0")
