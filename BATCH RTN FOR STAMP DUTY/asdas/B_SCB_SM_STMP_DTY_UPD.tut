@@ -87,6 +87,10 @@ setSharedStubs:
     UTF.addStubParam(STUB.WRT, UTF.any(), UTF.same())    ;* R.SECURITY.MASTER (the record being written)
     UTF.setRepeatable(STUB.WRT)
 
+    STUB.OCM = UTF.addStub("OCOMO")
+    UTF.addStubParam(STUB.OCM, UTF.any(), UTF.same())    ;* audit message text (in only)
+    UTF.setRepeatable(STUB.OCM)
+
     RETURN
 *** </region>
 *-----------------------------------------------------------------------------
